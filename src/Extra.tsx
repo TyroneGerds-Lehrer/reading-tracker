@@ -1,16 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from './lib/supabase';
 import { remove, save, sync } from './lib/data';
 import { computeStats, dayKey, type Book, type Session } from './lib/stats';
 
-const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+import { TZ } from './lib/tz';
 const inp = 'rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-800';
 const btn = 'rounded-lg bg-indigo-600 px-4 py-2 text-white shadow-sm hover:bg-indigo-700';
 const card = 'rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-800';
 export type Goal = { id: string; user_id: string; goal_type: string; target_value: number };
-const GT: Record<string, string> = { books_year: 'Bücher pro Jahr', pages_year: 'Seiten pro Jahr', pages_month: 'Seiten pro Monat', minutes_week: 'Lesezeit pro Woche (Min.)', minutes_day: 'Lesezeit pro Tag (Min.)', days_month: 'Lesetage pro Monat' };
+export const PERIODS: [string, string][] = [['7', '7 Tage'], ['30', '30 Tage'], ['90', '90 Tage'], ['month', 'Aktueller Monat'], ['lastmonth', 'Letzter Monat'], ['year', 'Aktuelles Jahr'], ['lastyear', 'Letztes Jahr'], ['all', 'Gesamter Zeitraum']];
+export const GT: Record<string, string> = { books_year: 'Bücher pro Jahr', pages_year: 'Seiten pro Jahr', pages_month: 'Seiten pro Monat', minutes_week: 'Lesezeit pro Woche (Min.)', minutes_day: 'Lesezeit pro Tag (Min.)', days_month: 'Lesetage pro Monat' };
 
-function progress(g: Goal, s: Session[], b: Book[]) {
+export function progress(g: Goal, s: Session[], b: Book[]) {
   const now = new Date(), t = dayKey(now, TZ), y = t.slice(0, 4), m = t.slice(0, 7), w = dayKey(new Date(now.getTime() - 6 * 864e5), TZ);
   const R: Record<string, [string, string]> = { books_year: [`${y}-01-01`, `${y}-12-31`], pages_year: [`${y}-01-01`, `${y}-12-31`], pages_month: [`${m}-01`, `${m}-31`], days_month: [`${m}-01`, `${m}-31`], minutes_week: [w, t], minutes_day: [t, t] };
   const [from, to] = R[g.goal_type], st = computeStats(s, b, { from, to }, TZ);
@@ -52,7 +53,27 @@ export function Heat({ sessions, books }: { sessions: Session[]; books: Book[] }
 }
 
 export function Settings({ books, sessions, goals, uid }: { books: Book[]; sessions: Session[]; goals: Goal[]; uid: string }) {
-  const [msg, setMsg] = useState('');
+  const [msg, setMsg] = useState(''), [name, setName] = useState(''), [tz, setTz] = useState(TZ), [theme, setTheme] = useState(localStorage.getItem('rt-theme') ?? 'light'), [pw, setPw] = useState('');
+  useEffect(() => { void supabase.from('profiles').select('display_name').eq('id', uid).maybeSingle().then(({ data }) => setName(data?.display_name ?? '')); }, [uid]);
+  const zones = [...new Set([TZ, ...(((Intl as any).supportedValuesOf?.('timeZone') as string[] | undefined) ?? ['Europe/Berlin'])])];
+  const saveProfile = async () => {
+    const { error } = await supabase.from('profiles').upsert({ id: uid, display_name: name.trim() || null, timezone: tz, preferred_theme: theme, preferred_language: 'de' });
+    if (error) return setMsg(error.message);
+    localStorage.setItem('rt-theme', theme); localStorage.setItem('rt-tz', tz); setMsg('Profil gespeichert.');
+    if (tz !== TZ || (theme === 'dark') !== document.documentElement.classList.contains('dark')) setTimeout(() => location.reload(), 600);
+  };
+  const changePw = async () => { if (pw.length < 8) return setMsg('Das Passwort muss mindestens 8 Zeichen lang sein.'); const { error } = await supabase.auth.updateUser({ password: pw }); setMsg(error ? error.message : 'Passwort geändert.'); if (!error) setPw(''); };
+  const demo = async () => {
+    const mk = (t: string, a: string, g: string, p: number) => ({ id: crypto.randomUUID(), user_id: uid, title: `[Beispiel] ${t}`, author: a, genre: g, total_pages: p, current_page: 0, status: 'reading', rating: null as number | null });
+    const bs = [mk('Beispielroman', 'Erika Muster', 'Roman', 320), mk('Beispiel-Sachbuch', 'Max Beispiel', 'Sachbuch', 280), mk('Beispiel-Krimi', 'Ina Probe', 'Krimi', 400)], pos = [0, 0, 0], ss: any[] = [];
+    for (let i = 89; i >= 0; i--) { if (Math.random() < 0.45) continue; const k = Math.floor(Math.random() * 3), pages = Math.min(bs[k].total_pages - pos[k], 10 + Math.floor(Math.random() * 30)); if (pages <= 0) continue;
+      const mins = Math.round(pages * (1.5 + Math.random())), d = new Date(Date.now() - i * 864e5);
+      ss.push({ id: crypto.randomUUID(), user_id: uid, book_id: bs[k].id, session_date: dayKey(d, TZ), start_time: d.toISOString(), end_time: new Date(d.getTime() + mins * 60000).toISOString(), duration_minutes: mins, start_page: pos[k], end_page: pos[k] + pages, notes: null }); pos[k] += pages; }
+    for (let i = 0; i < 3; i++) await save('books', { ...bs[i], current_page: pos[i] });
+    for (const s of ss) await save('reading_sessions', s);
+    setMsg(`Beispieldaten erzeugt (${ss.length} Sessions, Titel mit „[Beispiel]“ gekennzeichnet). Du kannst sie jederzeit löschen.`);
+  };
+  const undemo = async () => { const ids = new Set(books.filter(b => b.title.startsWith('[Beispiel]')).map(b => b.id)); if (!ids.size) return setMsg('Keine Beispieldaten vorhanden.'); for (const s of sessions) if (ids.has(s.book_id)) await remove('reading_sessions', s.id); for (const id of ids) await remove('books', id); setMsg('Beispieldaten gelöscht.'); };
   const dl = (name: string, text: string, type: string) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); URL.revokeObjectURL(a.href); };
   const csv = (rows: any[], cols: string[]) => '\ufeff' + [cols.join(';'), ...rows.map(r => cols.map(c => `"${String(r[c] ?? '').replace(/"/g, '""')}"`).join(';'))].join('\n');
   const day = dayKey(new Date(), TZ);
@@ -74,9 +95,21 @@ export function Settings({ books, sessions, goals, uid }: { books: Book[]; sessi
     <button className={btn} onClick={() => dl(`reading-tracker-backup-${day}.json`, JSON.stringify({ version: 1, exported_at: new Date().toISOString(), settings: { theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light', timezone: TZ }, books, reading_sessions: sessions, reading_goals: goals }, null, 2), 'application/json')}>JSON-Export</button>
     <button className={btn} onClick={() => dl(`buecher-${day}.csv`, csv(books, ['id', 'title', 'author', 'genre', 'total_pages', 'current_page', 'status', 'rating', 'start_date', 'finish_date']), 'text/csv')}>CSV Bücher</button>
     <button className={btn} onClick={() => dl(`sessions-${day}.csv`, csv(sessions, ['id', 'book_id', 'session_date', 'start_time', 'end_time', 'duration_minutes', 'start_page', 'end_page', 'notes']), 'text/csv')}>CSV Sessions</button>
+    <button className={btn} onClick={() => dl(`statistik-tageswerte-${day}.csv`, csv(computeStats(sessions, books, null, TZ).daily, ['day', 'pages', 'minutes', 'sessions']), 'text/csv')}>CSV Statistik</button>
     <label className={btn + ' cursor-pointer'}>JSON-Import<input type="file" accept=".json" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) void imp(f); e.target.value = ''; }} /></label></div>
     <p className="text-xs text-slate-500">Import überschreibt nie vorhandene Datensätze (gleiche IDs werden übersprungen) und prüft jeden Eintrag.</p></div>
+    <div className={card + ' space-y-3'}><h3 className="font-medium">Profil</h3><div className="flex flex-wrap items-end gap-3 text-sm">
+      <label>Anzeigename<input className={inp + ' ml-2'} value={name} onChange={e => setName(e.target.value)} /></label>
+      <label>Zeitzone<select className={inp + ' ml-2'} value={tz} onChange={e => setTz(e.target.value)}>{zones.map(z => <option key={z}>{z}</option>)}</select></label>
+      <label>Design<select className={inp + ' ml-2'} value={theme} onChange={e => setTheme(e.target.value)}><option value="light">Hell</option><option value="dark">Dunkel</option></select></label>
+      <label>Sprache<select className={inp + ' ml-2'} disabled><option>Deutsch</option></select></label><button className={btn} onClick={() => void saveProfile()}>Profil speichern</button></div>
+    <div className="flex flex-wrap items-end gap-3 text-sm"><label>Neues Passwort<input className={inp + ' ml-2'} type="password" minLength={8} value={pw} onChange={e => setPw(e.target.value)} /></label><button className={btn} onClick={() => void changePw()}>Passwort ändern</button></div>
+    <p className="text-xs text-slate-500">Name, Zeitzone und Design werden im Konto gespeichert und auf allen Geräten übernommen. Nach „Passwort zurücksetzen“ bist du über den E-Mail-Link angemeldet und kannst hier ein neues Passwort setzen.</p></div>
+    <div className={card + ' space-y-2'}><h3 className="font-medium">Anzeige</h3><div className="flex flex-wrap gap-4 text-sm"><label>Standard-Zeitraum<select className={inp + ' ml-2'} defaultValue={localStorage.getItem('rt-period') ?? '30'} onChange={e => localStorage.setItem('rt-period', e.target.value)}>{PERIODS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+    <label>Dashboard-Ansicht<select className={inp + ' ml-2'} defaultValue={localStorage.getItem('rt-view') ?? 'full'} onChange={e => localStorage.setItem('rt-view', e.target.value)}><option value="full">Ausführlich</option><option value="compact">Kompakt (ohne Diagramme)</option></select></label></div>
+    <p className="text-xs text-slate-500">Gilt für dieses Gerät und wird beim nächsten Öffnen von Dashboard bzw. Statistik übernommen.</p></div>
     <div className={card + ' space-y-2'}><h3 className="font-medium">Konto</h3><div className="flex flex-wrap gap-2"><button className={btn} onClick={() => void sync()}>Jetzt synchronisieren</button>
+      <button className={btn} onClick={() => void demo()}>Beispieldaten erzeugen</button><button className="rounded-lg border border-slate-400 px-4 py-2" onClick={() => void undemo()}>Beispieldaten löschen</button>
       <button className="rounded-lg border border-red-600 px-4 py-2 text-red-600" onClick={wipe}>Alle Daten löschen</button><button className="rounded-lg bg-red-600 px-4 py-2 text-white" onClick={del}>Konto löschen</button></div></div>
     {msg && <p className="text-sm text-amber-600">{msg}</p>}</div>;
 }

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { computeStats, dayKey, type Book, type Session } from './lib/stats';
 
-const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+import { TZ } from './lib/tz';
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const WD = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const GRAD = ['from-indigo-600 to-violet-600', 'from-sky-600 to-indigo-600', 'from-emerald-600 to-teal-600', 'from-rose-600 to-orange-500', 'from-fuchsia-600 to-purple-600', 'from-amber-500 to-red-500', 'from-slate-700 to-indigo-700'];

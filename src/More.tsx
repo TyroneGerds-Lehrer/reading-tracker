@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { computeStats, dayKey, isValid, pagesOf, type Book, type Session } from './lib/stats';
 
-const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+import { TZ } from './lib/tz';
 const inp = 'rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-800';
 const card = 'rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-800';
 const MON = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
@@ -76,7 +76,23 @@ function CalHist({ books, sessions }: { books: Book[]; sessions: Session[] }) {
 }
 
 export function More({ books, sessions }: { books: Book[]; sessions: Session[] }) {
-  const [t, setT] = useState(0), tabs = ['Bücher & Rekorde', 'Jahresvergleich', 'Kalender & Historie'];
+  const [t, setT] = useState(0), tabs = ['Bücher & Rekorde', 'Jahresvergleich', 'Kalender & Historie', 'Vergleiche'];
   return <div className="mt-4 space-y-3"><div className="flex gap-1">{tabs.map((x, i) => <button key={x} onClick={() => setT(i)} className={`rounded-lg px-3 py-1.5 text-sm ${t === i ? 'bg-indigo-600 text-white' : 'hover:bg-slate-200 dark:hover:bg-slate-700'}`}>{x}</button>)}</div>
-    {t === 0 && <BooksRecords books={books} sessions={sessions} />}{t === 1 && <Years books={books} sessions={sessions} />}{t === 2 && <CalHist books={books} sessions={sessions} />}</div>;
+    {t === 0 && <BooksRecords books={books} sessions={sessions} />}{t === 1 && <Years books={books} sessions={sessions} />}{t === 2 && <CalHist books={books} sessions={sessions} />}{t === 3 && <Compare books={books} sessions={sessions} />}</div>;
+}
+
+function Compare({ books, sessions }: { books: Book[]; sessions: Session[] }) {
+  const daily = useMemo(() => computeStats(sessions, books, null, TZ).daily, [sessions, books]);
+  if (!daily.length) return <p className={card}>Noch keine Daten für Vergleiche.</p>;
+  const dow = (n: number) => (new Date(n * 864e5).getUTCDay() + 6) % 7, wk = new Map<number, number>();
+  for (const d of daily) { const n = dn(d.day), w = n - dow(n); wk.set(w, (wk.get(w) ?? 0) + d.pages); }
+  const t = dn(dayKey(new Date(), TZ)), cw = t - dow(t), [cy, cm] = dayKey(new Date(), TZ).split('-').map(Number);
+  const weeks = Array.from({ length: 12 }, (_, i) => { const w = cw - 7 * (11 - i); return { n: new Date(w * 864e5).toISOString().slice(5, 10), Seiten: wk.get(w) ?? 0 }; });
+  const months = Array.from({ length: 12 }, (_, i) => { const ym = new Date(Date.UTC(cy, cm - 1 - (11 - i), 1)).toISOString().slice(0, 7), ds = daily.filter(d => d.day.startsWith(ym)); return { n: `${ym.slice(5)}/${ym.slice(2, 4)}`, Seiten: ds.reduce((a, d) => a + d.pages, 0), Minuten: Math.round(ds.reduce((a, d) => a + d.minutes, 0)) }; });
+  const ys = [...new Set(daily.map(d => +d.day.slice(0, 4)))].sort((a, b) => b - a).slice(0, 3).reverse(), colors = ['#94a3b8', '#8b5cf6', '#6366f1'].slice(-ys.length);
+  const byMonth = MON.map((m, i) => { const r: Record<string, string | number> = { n: m.slice(0, 3) }; for (const y of ys) r[String(y)] = daily.filter(d => d.day.startsWith(`${y}-${String(i + 1).padStart(2, '0')}`)).reduce((a, d) => a + d.pages, 0); return r; });
+  return <div className="grid gap-3 md:grid-cols-2"><div className={card}><h3 className="mb-2 font-medium">Seiten pro Woche (12 Wochen, Start = Montag)</h3><Bars data={weeks} k="Seiten" /></div>
+    <div className={card}><h3 className="mb-2 font-medium">Seiten pro Monat (12 Monate)</h3><Bars data={months} k="Seiten" color="#10b981" /></div>
+    <div className={card}><h3 className="mb-2 font-medium">Lesezeit pro Monat (Min., 12 Monate)</h3><Bars data={months} k="Minuten" color="#8b5cf6" /></div>
+    <div className={card}><h3 className="mb-2 font-medium">Monatsvergleich über die Jahre (Seiten)</h3><div className="h-44"><ResponsiveContainer><BarChart data={byMonth}><XAxis dataKey="n" /><YAxis /><Tooltip /><Legend />{ys.map((y, i) => <Bar key={y} dataKey={String(y)} fill={colors[i]} radius={[4, 4, 0, 0]} />)}</BarChart></ResponsiveContainer></div></div></div>;
 }

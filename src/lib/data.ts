@@ -49,3 +49,12 @@ export async function sync() {
 }
 window.addEventListener('online', () => void sync());
 window.addEventListener('offline', () => setStatus('offline'));
+
+// Konfliktlösung: Nutzer entscheidet, welche Version gilt.
+export async function resolveConflict(key: string, choice: 'local' | 'server') {
+  const d = await dbp, c = await d.get('conflicts', key); if (!c) return;
+  if (choice === 'local') await d.put('outbox', { key, t: c.t, op: 'upsert', row: c.local, base: c.serverUpdatedAt }); // erneut senden, Basis = aktuelle Serverversion
+  else { const { data } = await supabase.from(c.t).select('*').eq('id', c.local.id).maybeSingle(); if (data) await d.put(c.t, data); else await d.delete(c.t, c.local.id); }
+  await d.delete('conflicts', key);
+  window.dispatchEvent(new Event('rt-data')); void sync();
+}

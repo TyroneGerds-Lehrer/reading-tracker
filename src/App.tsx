@@ -6,10 +6,12 @@ import { getAll, getConflicts, getStatus, remove, save, sync, type SyncStatus } 
 import { Goals, Heat, Settings, type Goal } from './Extra';
 import { Wrapped } from './Wrapped';
 import { More } from './More';
+import { Dash } from './Dash';
+import { Conflicts } from './Conflicts';
 import { BookEditor, SessionEditor, deleteSession } from './Edit';
 import { computeStats, dayKey, insights, rangeFor, type Book, type Session } from './lib/stats';
 
-const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+import { TZ } from './lib/tz';
 const NAV = ['Dashboard', 'Meine Bücher', 'Lesesessions', 'Statistiken', 'Leseziele', 'Reading Wrapped', 'Einstellungen'];
 const STATUS_TXT: Record<SyncStatus, string> = { synced: 'Synchronisiert', syncing: 'Synchronisierung läuft', offline: 'Offline', failed: 'Synchronisierung fehlgeschlagen' };
 const BOOK_STATUS: Record<string, string> = { wishlist: 'Leseliste', reading: 'Aktuell am Lesen', paused: 'Pausiert', abandoned: 'Abgebrochen', finished: 'Abgeschlossen' };
@@ -111,7 +113,7 @@ function Sessions({ books, sessions, uid }: { books: Book[]; sessions: Session[]
 }
 
 function Statistics({ books, sessions }: { books: Book[]; sessions: Session[] }) {
-  const [p, setP] = useState('30');
+  const [p, setP] = useState(localStorage.getItem('rt-period') ?? '30'), [pick, setPick] = useState<string | null>(null);
   const s = useMemo(() => computeStats(sessions, books, rangeFor(p, TZ), TZ), [p, sessions, books]);
   const opts: [string, string][] = [['7', '7 Tage'], ['30', '30 Tage'], ['90', '90 Tage'], ['month', 'Aktueller Monat'], ['lastmonth', 'Letzter Monat'], ['year', 'Aktuelles Jahr'], ['lastyear', 'Letztes Jahr'], ['all', 'Gesamt']];
   const wd = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
@@ -119,19 +121,20 @@ function Statistics({ books, sessions }: { books: Book[]; sessions: Session[] })
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Stat l="Seiten" v={s.pages} /><Stat l="Lesezeit" v={fmtMin(s.minutes)} /><Stat l="Sessions" v={s.sessionsCount} /><Stat l="Ø Min./Session" v={Math.round(s.avgSessionMinutes)} />
       <Stat l="Aktive Tage" v={s.activeDays} /><Stat l="Lesefreie Tage" v={s.restDays} /><Stat l="Ø Seiten/Tag" v={s.avgPagesPerDay.toFixed(1)} /><Stat l="Seiten/Stunde" v={s.pagesPerHour ? Math.round(s.pagesPerHour) : '–'} />
       <Stat l="Längste Session" v={`${Math.round(s.record.longestSession)} Min.`} /><Stat l="Max. Seiten/Tag" v={s.record.maxPagesDay ? `${s.record.maxPagesDay.pages} (${s.record.maxPagesDay.day})` : '–'} /></div>
-    <div className={card}><h3 className="mb-2 font-medium">Lesezeit pro Tag (Min.)</h3><div className="h-56"><ResponsiveContainer><BarChart data={s.daily}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" tickFormatter={d => d.slice(5)} /><YAxis /><Tooltip /><Bar dataKey="minutes" name="Minuten" fill="#6366f1" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></div></div>
-    <div className={card}><h3 className="mb-2 font-medium">Lesezeit nach Wochentag (Min. gesamt)</h3><div className="h-48"><ResponsiveContainer><BarChart data={s.weekday.map((v, i) => ({ d: wd[i], minutes: Math.round(v.minutes) }))}><XAxis dataKey="d" /><YAxis /><Tooltip /><Bar dataKey="minutes" fill="#8b5cf6" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></div></div></div>;
+    <div className={card}><h3 className="mb-2 font-medium">Lesezeit pro Tag (Min.)</h3><div className="h-56"><ResponsiveContainer><BarChart data={s.daily}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" tickFormatter={d => d.slice(5)} /><YAxis /><Tooltip /><Bar dataKey="minutes" name="Minuten" fill="#6366f1" radius={[6, 6, 0, 0]} cursor="pointer" onClick={(d: any) => setPick(d?.day ?? null)} /></BarChart></ResponsiveContainer></div></div>
+    {pick && <div className={card + ' text-sm'}><b>{pick}</b>{sessions.filter(x => x.session_date === pick).map(x => <div key={x.id}>{books.find(b => b.id === x.book_id)?.title ?? '(gelöschtes Buch)'} · S. {x.start_page}–{x.end_page} · {Math.round(x.duration_minutes)} Min.</div>)}</div>}<div className={card}><h3 className="mb-2 font-medium">Lesezeit nach Wochentag (Min. gesamt)</h3><div className="h-48"><ResponsiveContainer><BarChart data={s.weekday.map((v, i) => ({ d: wd[i], minutes: Math.round(v.minutes) }))}><XAxis dataKey="d" /><YAxis /><Tooltip /><Bar dataKey="minutes" fill="#8b5cf6" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></div></div></div>;
 }
 
 export default function App() {
-  const [auth, setAuth] = useState<AuthSession | null | undefined>(undefined), [tab, setTab] = useState(0), [dark, setDark] = useState(matchMedia('(prefers-color-scheme: dark)').matches);
+  const [auth, setAuth] = useState<AuthSession | null | undefined>(undefined), [tab, setTab] = useState(0), [dark, setDark] = useState(localStorage.getItem('rt-theme') ? localStorage.getItem('rt-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
   const { books, sessions, goals, status, conflicts } = useLive();
   useEffect(() => { supabase.auth.getSession().then(r => setAuth(r.data.session)); const { data } = supabase.auth.onAuthStateChange((_e, s) => { setAuth(s); if (s) void sync(); }); return () => data.subscription.unsubscribe(); }, []);
   useEffect(() => { document.documentElement.classList.toggle('dark', dark); }, [dark]);
+  useEffect(() => { if (!auth) return; void supabase.from('profiles').select('timezone,preferred_theme').eq('id', auth.user.id).maybeSingle().then(({ data }) => { if (!data) return; if (data.preferred_theme) { localStorage.setItem('rt-theme', data.preferred_theme); setDark(data.preferred_theme === 'dark'); } if (data.timezone && data.timezone !== TZ) { localStorage.setItem('rt-tz', data.timezone); location.reload(); } }); }, [auth?.user.id]);
   if (auth === undefined) return null; if (!auth) return <Auth />;
   const uid = auth.user.id;
   return <div className="mx-auto max-w-5xl p-4"><header className="mb-4 flex flex-wrap items-center justify-between gap-2"><nav className="flex flex-wrap gap-1">{NAV.map((n, i) => <button key={n} onClick={() => setTab(i)} className={`rounded-lg px-3 py-1.5 text-sm ${tab === i ? 'bg-indigo-600 text-white' : 'hover:bg-slate-200 dark:hover:bg-slate-700'}`}>{n}</button>)}</nav>
-    <div className="flex items-center gap-3 text-sm"><span title="Synchronisierungsstatus">{STATUS_TXT[status]}{conflicts > 0 && ` · ${conflicts} Konflikt(e)`}</span><button onClick={() => setDark(!dark)}>{dark ? 'Hell' : 'Dunkel'}</button><button onClick={() => supabase.auth.signOut()}>Abmelden</button></div></header>
-    {tab === 0 && <Dashboard books={books} sessions={sessions} />}{tab === 1 && <Books books={books} uid={uid} />}{tab === 2 && <Sessions books={books} sessions={sessions} uid={uid} />}{tab === 3 && <><Statistics books={books} sessions={sessions} /><Heat books={books} sessions={sessions} /><More books={books} sessions={sessions} /></>}{tab === 4 && <Goals goals={goals} books={books} sessions={sessions} uid={uid} />}{tab === 6 && <Settings books={books} sessions={sessions} goals={goals} uid={uid} />}
+    <div className="flex items-center gap-3 text-sm"><span title="Synchronisierungsstatus">{STATUS_TXT[status]}{conflicts > 0 && <button className="ml-2 text-amber-600 underline" onClick={() => setTab(6)}>{conflicts} Konflikt(e)</button>}</span><button onClick={() => { const n = !dark; setDark(n); localStorage.setItem('rt-theme', n ? 'dark' : 'light'); void supabase.from('profiles').update({ preferred_theme: n ? 'dark' : 'light' }).eq('id', uid); }}>{dark ? 'Hell' : 'Dunkel'}</button><button onClick={() => supabase.auth.signOut()}>Abmelden</button></div></header>
+    {tab === 0 && <Dash books={books} sessions={sessions} goals={goals} />}{tab === 1 && <Books books={books} uid={uid} />}{tab === 2 && <Sessions books={books} sessions={sessions} uid={uid} />}{tab === 3 && <><Statistics books={books} sessions={sessions} /><Heat books={books} sessions={sessions} /><More books={books} sessions={sessions} /></>}{tab === 4 && <Goals goals={goals} books={books} sessions={sessions} uid={uid} />}{tab === 6 && <><Conflicts /><Settings books={books} sessions={sessions} goals={goals} uid={uid} /></>}
     {tab === 5 && <Wrapped books={books} sessions={sessions} />}</div>;
 }
