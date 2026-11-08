@@ -1,8 +1,8 @@
 // Lokale Daten (IndexedDB) + Outbox-Synchronisierung. Supabase ist die zentrale Quelle.
 import { openDB } from 'idb';
 import { supabase } from './supabase';
-export type T = 'books' | 'reading_sessions';
-const dbp = openDB('reading-tracker', 1, { upgrade(d) { for (const s of ['books', 'reading_sessions']) d.createObjectStore(s, { keyPath: 'id' }); d.createObjectStore('outbox', { keyPath: 'key' }); d.createObjectStore('conflicts', { keyPath: 'key' }); } });
+export type T = 'books' | 'reading_sessions' | 'reading_goals';
+const dbp = openDB('reading-tracker', 2, { upgrade(d) { for (const s of ['books', 'reading_sessions', 'reading_goals']) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id' }); for (const s of ['outbox', 'conflicts']) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'key' }); } });
 export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'failed';
 let status: SyncStatus = 'synced';
 const setStatus = (s: SyncStatus) => { status = s; window.dispatchEvent(new Event('rt-sync')); };
@@ -34,11 +34,11 @@ export async function sync() {
           const { data } = await supabase.from(o.t).select('updated_at').eq('id', o.row.id).maybeSingle();
           if (data && data.updated_at !== o.base) { await d.put('conflicts', { key: o.key, t: o.t, local: o.row, serverUpdatedAt: data.updated_at }); await d.delete('outbox', o.key); continue; }
         }
-        const { error } = await supabase.from(o.t).upsert(o.row); if (error) throw error; // feste Client-UUID => keine Duplikate
+        const { pages_read, ...row } = o.row; const { error } = await supabase.from(o.t).upsert(row); if (error) throw error; // feste Client-UUID => keine Duplikate
       }
       await d.delete('outbox', o.key);
     }
-    for (const t of ['books', 'reading_sessions'] as T[]) {
+    for (const t of ['books', 'reading_sessions', 'reading_goals'] as T[]) {
       const { data, error } = await supabase.from(t).select('*'); if (error) throw error;
       const pending = new Set((await d.getAllKeys('outbox')) as string[]), conflicts = new Set((await d.getAllKeys('conflicts')) as string[]), ids = new Set<string>();
       for (const r of data ?? []) { ids.add(r.id); if (!pending.has(t + r.id) && !conflicts.has(t + r.id)) await d.put(t, r); }

@@ -1,5 +1,5 @@
 // Zentrale Statistik-Engine: reine Funktionen, nur aus Sessions/Büchern berechnet (keine erfundenen Werte).
-export type Book = { id: string; user_id: string; title: string; author: string; genre?: string | null; total_pages: number; current_page: number; status: string; rating?: number | null; start_date?: string | null; finish_date?: string | null; updated_at?: string };
+export type Book = { id: string; user_id: string; title: string; author: string; genre?: string | null; total_pages: number; current_page: number; status: string; rating?: number | null; start_date?: string | null; finish_date?: string | null; cover_url?: string | null; isbn?: string | null; publication_year?: number | null; notes?: string | null; updated_at?: string };
 export type Session = { id: string; user_id: string; book_id: string; session_date: string; start_time?: string | null; end_time?: string | null; duration_minutes: number; start_page: number; end_page: number; notes?: string | null; updated_at?: string };
 export type Range = { from: string; to: string } | null; // YYYY-MM-DD, inklusive
 

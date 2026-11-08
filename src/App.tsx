@@ -3,6 +3,10 @@ import type { Session as AuthSession } from '@supabase/supabase-js';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { supabase } from './lib/supabase';
 import { getAll, getConflicts, getStatus, remove, save, sync, type SyncStatus } from './lib/data';
+import { Goals, Heat, Settings, type Goal } from './Extra';
+import { Wrapped } from './Wrapped';
+import { More } from './More';
+import { BookEditor, SessionEditor, deleteSession } from './Edit';
 import { computeStats, dayKey, insights, rangeFor, type Book, type Session } from './lib/stats';
 
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -15,9 +19,9 @@ const card = 'rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-800';
 const fmtMin = (m: number) => `${Math.floor(m / 60)} h ${Math.round(m % 60)} min`;
 
 function useLive() {
-  const [v, setV] = useState({ books: [] as Book[], sessions: [] as Session[], status: getStatus(), conflicts: 0 });
+  const [v, setV] = useState({ goals: [] as Goal[], books: [] as Book[], sessions: [] as Session[], status: getStatus(), conflicts: 0 });
   useEffect(() => {
-    const load = async () => setV({ books: await getAll<Book>('books'), sessions: await getAll<Session>('reading_sessions'), status: getStatus(), conflicts: (await getConflicts()).length });
+    const load = async () => setV({ goals: await getAll<Goal>('reading_goals'), books: await getAll<Book>('books'), sessions: await getAll<Session>('reading_sessions'), status: getStatus(), conflicts: (await getConflicts()).length });
     void load(); ['rt-sync', 'rt-data'].forEach(e => window.addEventListener(e, load)); return () => ['rt-sync', 'rt-data'].forEach(e => window.removeEventListener(e, load));
   }, []);
   return v;
@@ -56,7 +60,7 @@ function Dashboard({ books, sessions }: { books: Book[]; sessions: Session[] }) 
 }
 
 function Books({ books, uid }: { books: Book[]; uid: string }) {
-  const [f, setF] = useState({ title: '', author: '', genre: '', total_pages: 0 }), [q, setQ] = useState(''), [st, setSt] = useState('');
+  const [f, setF] = useState({ title: '', author: '', genre: '', total_pages: 0 }), [q, setQ] = useState(''), [st, setSt] = useState(''), [ed, setEd] = useState<string | null>(null);
   const add = () => { if (!f.title.trim()) return; void save('books', { id: crypto.randomUUID(), user_id: uid, ...f, title: f.title.trim(), genre: f.genre || null, current_page: 0, status: 'wishlist', rating: null }); setF({ title: '', author: '', genre: '', total_pages: 0 }); };
   const upd = (b: Book, p: Partial<Book>) => { const n = { ...b, ...p }; if (p.status === 'finished') { n.finish_date = dayKey(new Date(), TZ); if (n.total_pages) n.current_page = n.total_pages; } void save('books', n, b.updated_at); };
   const list = books.filter(b => (!st || b.status === st) && `${b.title} ${b.author}`.toLowerCase().includes(q.toLowerCase()));
@@ -66,17 +70,17 @@ function Books({ books, uid }: { books: Book[]; uid: string }) {
     <button className={btn} onClick={add}>Buch hinzufügen</button></div>
     <div className="flex gap-2"><input className={inp} placeholder="Suchen…" value={q} onChange={e => setQ(e.target.value)} /><select className={inp} value={st} onChange={e => setSt(e.target.value)}><option value="">Alle Status</option>{Object.entries(BOOK_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
     {list.length === 0 && <p className="text-slate-500">Keine Bücher vorhanden.</p>}
-    {list.map(b => <div key={b.id} className={card + ' flex flex-wrap items-center justify-between gap-2'}><div><div className="font-medium">{b.title}</div><div className="text-sm text-slate-500">{b.author}{b.total_pages ? ` · ${Math.round(b.current_page / b.total_pages * 100)} % (${b.current_page}/${b.total_pages})` : ''}</div></div>
+    {list.map(b => ed === b.id ? <div key={b.id} className={card}><BookEditor book={b} onClose={() => setEd(null)} /></div> : <div key={b.id} className={card + ' flex flex-wrap items-center justify-between gap-2'}><div>{b.cover_url && /^https?:\/\//.test(b.cover_url) && <img src={b.cover_url} alt="" referrerPolicy="no-referrer" className="mb-1 h-16 rounded object-cover" />}<div className="font-medium">{b.title}</div><div className="text-sm text-slate-500">{b.author}{b.total_pages ? ` · ${Math.round(b.current_page / b.total_pages * 100)} % (${b.current_page}/${b.total_pages})` : ''}</div></div>
       <div className="flex items-center gap-2"><select className={inp} value={b.status} onChange={e => upd(b, { status: e.target.value })}>{Object.entries(BOOK_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
         <select className={inp} value={b.rating ?? ''} onChange={e => upd(b, { rating: e.target.value ? +e.target.value : null })}><option value="">★</option>{[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}★</option>)}</select>
-        <button className="text-red-600" onClick={() => confirm('Buch und zugehörige Sessions löschen?') && void remove('books', b.id)}>Löschen</button></div></div>)}</div>;
+        <button onClick={() => setEd(b.id)}>Bearbeiten</button><button className="text-red-600" onClick={() => confirm('Buch und zugehörige Sessions löschen?') && void remove('books', b.id)}>Löschen</button></div></div>)}</div>;
 }
 
 type Timer = { start: string; acc: number; run: number | null };
 function Sessions({ books, sessions, uid }: { books: Book[]; sessions: Session[]; uid: string }) {
   const K = 'rt-timer', [tm, setTm] = useState<Timer | null>(() => JSON.parse(localStorage.getItem(K) ?? 'null'));
   const [started, setStarted] = useState<string | null>(null), [, tick] = useState(0), [err, setErr] = useState('');
-  const [f, setF] = useState({ book: '', start: 0, end: 0, min: 0, note: '' });
+  const [f, setF] = useState({ book: '', start: 0, end: 0, min: 0, note: '' }), [ed, setEd] = useState<string | null>(null);
   useEffect(() => { const i = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(i); }, []);
   const persist = (v: Timer | null) => { setTm(v); if (v) localStorage.setItem(K, JSON.stringify(v)); else localStorage.removeItem(K); }; // überlebt Neuladen
   const ms = tm ? tm.acc + (tm.run ? Date.now() - tm.run : 0) : 0;
@@ -102,8 +106,8 @@ function Sessions({ books, sessions, uid }: { books: Book[]; sessions: Session[]
       <input className={inp + ' w-24'} type="number" min={0} value={f.start} onChange={e => setF({ ...f, start: +e.target.value })} aria-label="Startseite" /><input className={inp + ' w-24'} type="number" min={0} value={f.end} onChange={e => setF({ ...f, end: +e.target.value })} aria-label="Endseite" />
       <input className={inp + ' w-24'} type="number" min={0} step="0.1" value={f.min} onChange={e => setF({ ...f, min: +e.target.value })} aria-label="Minuten" /><input className={inp} placeholder="Notiz" value={f.note} onChange={e => setF({ ...f, note: e.target.value })} />
       <button className={btn} onClick={submit}>Session speichern</button></div>{err && <p className="text-sm text-red-600">{err}</p>}</div>
-    {[...sessions].sort((a, b) => (b.start_time ?? b.session_date).localeCompare(a.start_time ?? a.session_date)).slice(0, 100).map(s => <div key={s.id} className={card + ' flex justify-between text-sm'}>
-      <span>{s.session_date} · {bt(s.book_id)} · S. {s.start_page}–{s.end_page} ({s.end_page - s.start_page} Seiten) · {Math.round(s.duration_minutes)} Min.</span><button className="text-red-600" onClick={() => confirm('Session löschen?') && void remove('reading_sessions', s.id)}>Löschen</button></div>)}</div>;
+    {[...sessions].sort((a, b) => (b.start_time ?? b.session_date).localeCompare(a.start_time ?? a.session_date)).slice(0, 100).map(s => <div key={s.id} className={card + ' text-sm'}>{ed === s.id ? <SessionEditor s={s} books={books} sessions={sessions} onClose={() => setEd(null)} /> : <div className="flex justify-between gap-2">
+      <span>{s.session_date} · {bt(s.book_id)} · S. {s.start_page}–{s.end_page} ({s.end_page - s.start_page} Seiten) · {Math.round(s.duration_minutes)} Min.</span><span className="flex gap-3"><button onClick={() => setEd(s.id)}>Bearbeiten</button><button className="text-red-600" onClick={() => confirm('Session löschen?') && void deleteSession(s, sessions, books)}>Löschen</button></span></div>}</div>)}</div>;
 }
 
 function Statistics({ books, sessions }: { books: Book[]; sessions: Session[] }) {
@@ -121,13 +125,13 @@ function Statistics({ books, sessions }: { books: Book[]; sessions: Session[] })
 
 export default function App() {
   const [auth, setAuth] = useState<AuthSession | null | undefined>(undefined), [tab, setTab] = useState(0), [dark, setDark] = useState(matchMedia('(prefers-color-scheme: dark)').matches);
-  const { books, sessions, status, conflicts } = useLive();
+  const { books, sessions, goals, status, conflicts } = useLive();
   useEffect(() => { supabase.auth.getSession().then(r => setAuth(r.data.session)); const { data } = supabase.auth.onAuthStateChange((_e, s) => { setAuth(s); if (s) void sync(); }); return () => data.subscription.unsubscribe(); }, []);
   useEffect(() => { document.documentElement.classList.toggle('dark', dark); }, [dark]);
   if (auth === undefined) return null; if (!auth) return <Auth />;
   const uid = auth.user.id;
   return <div className="mx-auto max-w-5xl p-4"><header className="mb-4 flex flex-wrap items-center justify-between gap-2"><nav className="flex flex-wrap gap-1">{NAV.map((n, i) => <button key={n} onClick={() => setTab(i)} className={`rounded-lg px-3 py-1.5 text-sm ${tab === i ? 'bg-indigo-600 text-white' : 'hover:bg-slate-200 dark:hover:bg-slate-700'}`}>{n}</button>)}</nav>
     <div className="flex items-center gap-3 text-sm"><span title="Synchronisierungsstatus">{STATUS_TXT[status]}{conflicts > 0 && ` · ${conflicts} Konflikt(e)`}</span><button onClick={() => setDark(!dark)}>{dark ? 'Hell' : 'Dunkel'}</button><button onClick={() => supabase.auth.signOut()}>Abmelden</button></div></header>
-    {tab === 0 && <Dashboard books={books} sessions={sessions} />}{tab === 1 && <Books books={books} uid={uid} />}{tab === 2 && <Sessions books={books} sessions={sessions} uid={uid} />}{tab === 3 && <Statistics books={books} sessions={sessions} />}
-    {tab > 3 && <p className={card}>„{NAV[tab]}“ ist in dieser ersten Version noch nicht umgesetzt.</p>}</div>;
+    {tab === 0 && <Dashboard books={books} sessions={sessions} />}{tab === 1 && <Books books={books} uid={uid} />}{tab === 2 && <Sessions books={books} sessions={sessions} uid={uid} />}{tab === 3 && <><Statistics books={books} sessions={sessions} /><Heat books={books} sessions={sessions} /><More books={books} sessions={sessions} /></>}{tab === 4 && <Goals goals={goals} books={books} sessions={sessions} uid={uid} />}{tab === 6 && <Settings books={books} sessions={sessions} goals={goals} uid={uid} />}
+    {tab === 5 && <Wrapped books={books} sessions={sessions} />}</div>;
 }
