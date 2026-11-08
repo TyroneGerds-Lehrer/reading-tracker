@@ -16,7 +16,7 @@ const KV = ({ l, v }: { l: string; v: string | number }) => <div className="flex
 function BooksRecords({ books, sessions }: { books: Book[]; sessions: Session[] }) {
   const d = useMemo(() => {
     const v = sessions.filter(isValid), all = computeStats(v, books, null, TZ), fin = books.filter(b => b.status === 'finished');
-    const per = new Map(books.map(b => [b.id, { b, min: 0, n: 0 }] as const)), auth = new Map<string, number>(), gen = new Map<string, number>(), mp = new Map<string, number>(), mb = new Map<string, number>();
+    const per = new Map<string, { b: Book; min: number; n: number }>(books.map(b => [b.id, { b, min: 0, n: 0 }] as [string, { b: Book; min: number; n: number }])), auth = new Map<string, number>(), gen = new Map<string, number>(), mp = new Map<string, number>(), mb = new Map<string, number>();
     const bk = new Map(books.map(b => [b.id, b] as const));
     for (const s of v) { const e = per.get(s.book_id); if (e) { e.min += s.duration_minutes; e.n++; } const a = bk.get(s.book_id)?.author; if (a) inc(auth, a, pagesOf(s)); inc(mp, s.session_date.slice(0, 7), pagesOf(s)); }
     for (const b of books) if (b.genre) inc(gen, b.genre);
