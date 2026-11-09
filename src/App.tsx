@@ -1,3 +1,5 @@
+import { AlertTriangle, BarChart3, BookOpen, Cloud, CloudOff, LayoutDashboard, LogOut, Menu, Moon, RefreshCw, Settings as SettingsIcon, Sparkles, Sun, Target, Timer, type LucideIcon } from 'lucide-react';
+import { Empty, Skeleton, btn, card, inp } from './ui';
 import { useEffect, useMemo, useState } from 'react';
 import type { Session as AuthSession } from '@supabase/supabase-js';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -15,15 +17,12 @@ import { TZ } from './lib/tz';
 const NAV = ['Dashboard', 'Meine Bücher', 'Lesesessions', 'Statistiken', 'Leseziele', 'Reading Wrapped', 'Einstellungen'];
 const STATUS_TXT: Record<SyncStatus, string> = { synced: 'Synchronisiert', syncing: 'Synchronisierung läuft', offline: 'Offline', failed: 'Synchronisierung fehlgeschlagen' };
 const BOOK_STATUS: Record<string, string> = { wishlist: 'Leseliste', reading: 'Aktuell am Lesen', paused: 'Pausiert', abandoned: 'Abgebrochen', finished: 'Abgeschlossen' };
-const inp = 'rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-800';
-const btn = 'rounded-lg bg-indigo-600 px-4 py-2 text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50';
-const card = 'rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-800';
 const fmtMin = (m: number) => `${Math.floor(m / 60)} h ${Math.round(m % 60)} min`;
 
 function useLive() {
-  const [v, setV] = useState({ goals: [] as Goal[], books: [] as Book[], sessions: [] as Session[], status: getStatus(), conflicts: 0 });
+  const [v, setV] = useState({ goals: [] as Goal[], books: [] as Book[], sessions: [] as Session[], status: getStatus(), conflicts: 0, ready: false });
   useEffect(() => {
-    const load = async () => setV({ goals: await getAll<Goal>('reading_goals'), books: await getAll<Book>('books'), sessions: await getAll<Session>('reading_sessions'), status: getStatus(), conflicts: (await getConflicts()).length });
+    const load = async () => setV({ ready: true, goals: await getAll<Goal>('reading_goals'), books: await getAll<Book>('books'), sessions: await getAll<Session>('reading_sessions'), status: getStatus(), conflicts: (await getConflicts()).length });
     void load(); ['rt-sync', 'rt-data'].forEach(e => window.addEventListener(e, load)); return () => ['rt-sync', 'rt-data'].forEach(e => window.removeEventListener(e, load));
   }, []);
   return v;
@@ -37,14 +36,15 @@ function Auth() {
       : await supabase.auth.resetPasswordForEmail(email, { redirectTo: location.href });
     setMsg(r.error ? r.error.message : kind === 'in' ? '' : 'Bitte prüfe dein E-Mail-Postfach.');
   };
-  return <div className="mx-auto mt-24 max-w-sm space-y-3 p-4"><h1 className="text-2xl font-semibold">Reading Tracker</h1>
-    <input className={inp + ' w-full'} placeholder="E-Mail" type="email" value={email} onChange={e => setEmail(e.target.value)} />
-    <input className={inp + ' w-full'} placeholder="Passwort" type="password" value={pw} onChange={e => setPw(e.target.value)} />
-    <div className="flex gap-2"><button className={btn} onClick={() => run('in')}>Anmelden</button><button className={btn} onClick={() => run('up')}>Registrieren</button></div>
-    <button className="text-sm underline" onClick={() => run('reset')}>Passwort zurücksetzen</button>{msg && <p className="text-sm text-amber-600">{msg}</p>}</div>;
+  return <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-zinc-50 to-violet-50 p-4 dark:from-zinc-950 dark:via-zinc-950 dark:to-indigo-950/40"><div className={card + ' w-full max-w-sm space-y-4 !p-6 rt-page'}>
+    <div className="flex items-center gap-3"><div className="rounded-xl bg-indigo-600 p-2.5 text-white shadow-md shadow-indigo-600/30"><BookOpen className="h-5 w-5" /></div><div><div className="text-lg font-semibold tracking-tight">Reading Tracker</div><div className="text-xs text-zinc-500">Dein persönliches Lese-Dashboard</div></div></div>
+    <input className={inp + ' w-full'} placeholder="E-Mail" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} />
+    <input className={inp + ' w-full'} placeholder="Passwort" type="password" autoComplete="current-password" value={pw} onChange={e => setPw(e.target.value)} />
+    <div className="grid grid-cols-2 gap-2"><button className={btn} onClick={() => run('in')}>Anmelden</button><button className="inline-flex items-center justify-center rounded-xl border border-zinc-300 px-4 py-2 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800" onClick={() => run('up')}>Registrieren</button></div>
+    <button className="text-sm text-indigo-600 underline dark:text-indigo-300" onClick={() => run('reset')}>Passwort zurücksetzen</button>{msg && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">{msg}</p>}</div></div>;
 }
 
-function Stat({ l, v }: { l: string; v: string | number }) { return <div className={card}><div className="text-sm text-slate-500">{l}</div><div className="text-2xl font-semibold">{v}</div></div>; }
+function Stat({ l, v }: { l: string; v: string | number }) { return <div className={card + ' !p-4'}><div className="text-xs font-medium uppercase tracking-wide text-zinc-500">{l}</div><div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight md:text-3xl">{v}</div></div>; }
 
 function Dashboard({ books, sessions }: { books: Book[]; sessions: Session[] }) {
   const s = useMemo(() => computeStats(sessions, books, null, TZ), [sessions, books]);
@@ -71,8 +71,8 @@ function Books({ books, uid }: { books: Book[]; uid: string }) {
     <input className={inp} placeholder="Genre" value={f.genre} onChange={e => setF({ ...f, genre: e.target.value })} /><input className={inp + ' w-28'} type="number" min={0} placeholder="Seiten" value={f.total_pages || ''} onChange={e => setF({ ...f, total_pages: Math.max(0, +e.target.value) })} />
     <button className={btn} onClick={add}>Buch hinzufügen</button></div>
     <div className="flex gap-2"><input className={inp} placeholder="Suchen…" value={q} onChange={e => setQ(e.target.value)} /><select className={inp} value={st} onChange={e => setSt(e.target.value)}><option value="">Alle Status</option>{Object.entries(BOOK_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
-    {list.length === 0 && <p className="text-slate-500">Keine Bücher vorhanden.</p>}
-    {list.map(b => ed === b.id ? <div key={b.id} className={card}><BookEditor book={b} onClose={() => setEd(null)} /></div> : <div key={b.id} className={card + ' flex flex-wrap items-center justify-between gap-2'}><div>{b.cover_url && /^https?:\/\//.test(b.cover_url) && <img src={b.cover_url} alt="" referrerPolicy="no-referrer" className="mb-1 h-16 rounded object-cover" />}<div className="font-medium">{b.title}</div><div className="text-sm text-slate-500">{b.author}{b.total_pages ? ` · ${Math.round(b.current_page / b.total_pages * 100)} % (${b.current_page}/${b.total_pages})` : ''}</div></div>
+    {list.length === 0 && <Empty icon={BookOpen} title="Keine Bücher" text="Füge oben dein erstes Buch hinzu." />}
+    {list.map(b => ed === b.id ? <div key={b.id} className={card}><BookEditor book={b} onClose={() => setEd(null)} /></div> : <div key={b.id} className={card + ' flex flex-wrap items-center justify-between gap-2'}><div>{b.cover_url && /^https?:\/\//.test(b.cover_url) && <img src={b.cover_url} alt="" referrerPolicy="no-referrer" className="mb-1 h-16 rounded object-cover" />}<div className="font-medium">{b.title}</div><div className="text-sm text-zinc-500">{b.author}{b.total_pages ? ` · ${Math.round(b.current_page / b.total_pages * 100)} % (${b.current_page}/${b.total_pages})` : ''}</div></div>
       <div className="flex items-center gap-2"><select className={inp} value={b.status} onChange={e => upd(b, { status: e.target.value })}>{Object.entries(BOOK_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
         <select className={inp} value={b.rating ?? ''} onChange={e => upd(b, { rating: e.target.value ? +e.target.value : null })}><option value="">★</option>{[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}★</option>)}</select>
         <button onClick={() => setEd(b.id)}>Bearbeiten</button><button className="text-red-600" onClick={() => confirm('Buch und zugehörige Sessions löschen?') && void remove('books', b.id)}>Löschen</button></div></div>)}</div>;
@@ -125,16 +125,44 @@ function Statistics({ books, sessions }: { books: Book[]; sessions: Session[] })
     {pick && <div className={card + ' text-sm'}><b>{pick}</b>{sessions.filter(x => x.session_date === pick).map(x => <div key={x.id}>{books.find(b => b.id === x.book_id)?.title ?? '(gelöschtes Buch)'} · S. {x.start_page}–{x.end_page} · {Math.round(x.duration_minutes)} Min.</div>)}</div>}<div className={card}><h3 className="mb-2 font-medium">Lesezeit nach Wochentag (Min. gesamt)</h3><div className="h-48"><ResponsiveContainer><BarChart data={s.weekday.map((v, i) => ({ d: wd[i], minutes: Math.round(v.minutes) }))}><XAxis dataKey="d" /><YAxis /><Tooltip /><Bar dataKey="minutes" fill="#8b5cf6" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></div></div></div>;
 }
 
+const NAVI: LucideIcon[] = [LayoutDashboard, BookOpen, Timer, BarChart3, Target, Sparkles, SettingsIcon];
+const SYNC: Record<SyncStatus, { Icon: LucideIcon; cls: string }> = {
+  synced: { Icon: Cloud, cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' },
+  syncing: { Icon: RefreshCw, cls: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300' },
+  offline: { Icon: CloudOff, cls: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' },
+  failed: { Icon: AlertTriangle, cls: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300' },
+};
+
 export default function App() {
-  const [auth, setAuth] = useState<AuthSession | null | undefined>(undefined), [tab, setTab] = useState(0), [dark, setDark] = useState(localStorage.getItem('rt-theme') ? localStorage.getItem('rt-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
-  const { books, sessions, goals, status, conflicts } = useLive();
+  const [auth, setAuth] = useState<AuthSession | null | undefined>(undefined), [tab, setTab] = useState(0), [more, setMore] = useState(false), [dark, setDark] = useState(localStorage.getItem('rt-theme') ? localStorage.getItem('rt-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
+  const { books, sessions, goals, status, conflicts, ready } = useLive();
   useEffect(() => { supabase.auth.getSession().then(r => setAuth(r.data.session)); const { data } = supabase.auth.onAuthStateChange((_e, s) => { setAuth(s); if (s) void sync(); }); return () => data.subscription.unsubscribe(); }, []);
   useEffect(() => { document.documentElement.classList.toggle('dark', dark); }, [dark]);
   useEffect(() => { if (!auth) return; void supabase.from('profiles').select('timezone,preferred_theme').eq('id', auth.user.id).maybeSingle().then(({ data }) => { if (!data) return; if (data.preferred_theme) { localStorage.setItem('rt-theme', data.preferred_theme); setDark(data.preferred_theme === 'dark'); } if (data.timezone && data.timezone !== TZ) { localStorage.setItem('rt-tz', data.timezone); location.reload(); } }); }, [auth?.user.id]);
-  if (auth === undefined) return null; if (!auth) return <Auth />;
-  const uid = auth.user.id;
-  return <div className="mx-auto max-w-5xl p-4"><header className="mb-4 flex flex-wrap items-center justify-between gap-2"><nav className="flex flex-wrap gap-1">{NAV.map((n, i) => <button key={n} onClick={() => setTab(i)} className={`rounded-lg px-3 py-1.5 text-sm ${tab === i ? 'bg-indigo-600 text-white' : 'hover:bg-slate-200 dark:hover:bg-slate-700'}`}>{n}</button>)}</nav>
-    <div className="flex items-center gap-3 text-sm"><span title="Synchronisierungsstatus">{STATUS_TXT[status]}{conflicts > 0 && <button className="ml-2 text-amber-600 underline" onClick={() => setTab(6)}>{conflicts} Konflikt(e)</button>}</span><button onClick={() => { const n = !dark; setDark(n); localStorage.setItem('rt-theme', n ? 'dark' : 'light'); void supabase.from('profiles').update({ preferred_theme: n ? 'dark' : 'light' }).eq('id', uid); }}>{dark ? 'Hell' : 'Dunkel'}</button><button onClick={() => supabase.auth.signOut()}>Abmelden</button></div></header>
-    {tab === 0 && <Dash books={books} sessions={sessions} goals={goals} />}{tab === 1 && <Books books={books} uid={uid} />}{tab === 2 && <Sessions books={books} sessions={sessions} uid={uid} />}{tab === 3 && <><Statistics books={books} sessions={sessions} /><Heat books={books} sessions={sessions} /><More books={books} sessions={sessions} /></>}{tab === 4 && <Goals goals={goals} books={books} sessions={sessions} uid={uid} />}{tab === 6 && <><Conflicts /><Settings books={books} sessions={sessions} goals={goals} uid={uid} /></>}
-    {tab === 5 && <Wrapped books={books} sessions={sessions} />}</div>;
+  if (auth === undefined) return <div className="p-6"><Skeleton /></div>;
+  if (!auth) return <Auth />;
+  const uid = auth.user.id, go = (i: number) => { setTab(i); setMore(false); window.scrollTo({ top: 0 }); };
+  const toggleTheme = () => { const n = !dark; setDark(n); localStorage.setItem('rt-theme', n ? 'dark' : 'light'); void supabase.from('profiles').update({ preferred_theme: n ? 'dark' : 'light' }).eq('id', uid); };
+  const { Icon: SIcon, cls } = SYNC[status];
+  const pill = <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cls}`} title="Synchronisierungsstatus"><SIcon className={`h-3.5 w-3.5 ${status === 'syncing' ? 'animate-spin' : ''}`} />{STATUS_TXT[status]}</span>;
+  const confBtn = conflicts > 0 && <button className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" onClick={() => go(6)}>{conflicts} Konflikt(e)</button>;
+  const logo = <div className="flex items-center gap-2.5"><div className="rounded-xl bg-indigo-600 p-2 text-white shadow-md shadow-indigo-600/30"><BookOpen className="h-4 w-4" /></div><span className="font-semibold tracking-tight">Reading Tracker</span></div>;
+  const side = (i: number) => { const I = NAVI[i]; return <button key={i} onClick={() => go(i)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${tab === i ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/70'}`}><I className="h-[18px] w-[18px]" />{NAV[i]}</button>; };
+  const bot = (i: number, label: string) => { const I = NAVI[i]; return <button key={i} onClick={() => go(i)} className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${tab === i ? 'text-indigo-600 dark:text-indigo-300' : 'text-zinc-500'}`}><I className="h-5 w-5" />{label}</button>; };
+  const themeBtn = <button onClick={toggleTheme} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/70">{dark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}{dark ? 'Heller Modus' : 'Dunkler Modus'}</button>;
+  const outBtn = <button onClick={() => supabase.auth.signOut()} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/70"><LogOut className="h-[18px] w-[18px]" />Abmelden</button>;
+  return <div className="min-h-screen md:pl-64">
+    <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col gap-1 border-r border-zinc-200 bg-white/80 p-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80 md:flex"><div className="mb-5 px-1 pt-1">{logo}</div>
+      {[0, 1, 2, 3, 4, 5, 6].map(side)}<div className="mt-auto flex flex-col gap-1"><div className="flex flex-wrap items-center gap-2 px-1 pb-2">{pill}{confBtn}</div>{themeBtn}{outBtn}</div></aside>
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-zinc-200 bg-white/85 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/85 md:hidden" style={{ paddingTop: 'max(.75rem, env(safe-area-inset-top))' }}>{logo}<div className="flex items-center gap-2">{confBtn}{pill}</div></header>
+    <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-8"><h1 className="mb-5 text-2xl font-semibold tracking-tight md:text-3xl">{NAV[tab]}</h1>
+      <div key={tab} className="rt-page">{!ready ? <Skeleton /> : <>
+        {tab === 0 && <Dash books={books} sessions={sessions} goals={goals} />}{tab === 1 && <Books books={books} uid={uid} />}{tab === 2 && <Sessions books={books} sessions={sessions} uid={uid} />}
+        {tab === 3 && <><Statistics books={books} sessions={sessions} /><Heat books={books} sessions={sessions} /><More books={books} sessions={sessions} /></>}
+        {tab === 4 && <Goals goals={goals} books={books} sessions={sessions} uid={uid} />}{tab === 5 && <Wrapped books={books} sessions={sessions} />}
+        {tab === 6 && <><Conflicts /><Settings books={books} sessions={sessions} goals={goals} uid={uid} /></>}</>}</div></main>
+    {more && <div className="fixed inset-0 z-30 md:hidden" onClick={() => setMore(false)}><div className="absolute inset-x-3 bottom-20 flex flex-col gap-1 rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl dark:border-zinc-800 dark:bg-zinc-900" onClick={e => e.stopPropagation()}>{[4, 5, 6].map(side)}{themeBtn}{outBtn}</div></div>}
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 md:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      {bot(0, 'Start')}{bot(1, 'Bücher')}{bot(2, 'Sessions')}{bot(3, 'Statistik')}
+      <button onClick={() => setMore(!more)} className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${tab >= 4 || more ? 'text-indigo-600 dark:text-indigo-300' : 'text-zinc-500'}`}><Menu className="h-5 w-5" />Mehr</button></nav></div>;
 }

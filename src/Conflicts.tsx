@@ -20,14 +20,14 @@ export function Conflicts() {
     return () => { alive = false; window.removeEventListener('rt-data', load); window.removeEventListener('rt-sync', load); };
   }, []);
   if (!cs.length) return null;
-  return <div className="mb-3 space-y-3 rounded-2xl border border-amber-400 bg-amber-50 p-4 dark:bg-slate-800"><h3 className="font-medium">Synchronisierungs-Konflikte ({cs.length})</h3>
-    <p className="text-sm text-slate-600 dark:text-slate-300">Diese Einträge wurden auf einem anderen Gerät geändert, während du hier eine abweichende Änderung gemacht hast. Nichts wurde überschrieben – entscheide, welche Version gelten soll.</p>
+  return <div className="mb-3 space-y-3 rounded-2xl border border-amber-400 bg-amber-50 p-4 dark:bg-zinc-900"><h3 className="font-medium">Synchronisierungs-Konflikte ({cs.length})</h3>
+    <p className="text-sm text-zinc-600 dark:text-zinc-300">Diese Einträge wurden auf einem anderen Gerät geändert, während du hier eine abweichende Änderung gemacht hast. Nichts wurde überschrieben – entscheide, welche Version gelten soll.</p>
     {cs.map(c => {
       const keys = [...new Set([...Object.keys(c.local), ...Object.keys(c.server ?? {})])].filter(k => !IGN.has(k) && (!c.server || JSON.stringify(c.local[k] ?? null) !== JSON.stringify(c.server[k] ?? null)));
-      return <div key={c.key} className="rounded-xl bg-white p-3 text-sm dark:bg-slate-900"><div className="font-medium">{c.t === 'books' ? 'Buch' : 'Session'}: {c.local.title ?? c.local.session_date}</div>
-        {!c.server ? <p className="text-red-600">Dieser Eintrag wurde auf dem Server gelöscht.</p> : <table className="my-2 w-full"><thead><tr className="text-left text-slate-500"><th>Feld</th><th>Deine Version</th><th>Server-Version</th></tr></thead>
-          <tbody>{keys.length ? keys.map(k => <tr key={k}><td>{L[k] ?? k}</td><td>{show(c.local[k])}</td><td>{show(c.server[k])}</td></tr>) : <tr><td colSpan={3} className="text-slate-500">Keine inhaltlichen Unterschiede.</td></tr>}</tbody></table>}
+      return <div key={c.key} className="rounded-xl bg-white p-3 text-sm dark:bg-zinc-900"><div className="font-medium">{c.t === 'books' ? 'Buch' : 'Session'}: {c.local.title ?? c.local.session_date}</div>
+        {!c.server ? <p className="text-red-600">Dieser Eintrag wurde auf dem Server gelöscht.</p> : <table className="my-2 w-full"><thead><tr className="text-left text-zinc-500"><th>Feld</th><th>Deine Version</th><th>Server-Version</th></tr></thead>
+          <tbody>{keys.length ? keys.map(k => <tr key={k}><td>{L[k] ?? k}</td><td>{show(c.local[k])}</td><td>{show(c.server[k])}</td></tr>) : <tr><td colSpan={3} className="text-zinc-500">Keine inhaltlichen Unterschiede.</td></tr>}</tbody></table>}
         <div className="flex gap-2"><button className="rounded-lg bg-indigo-600 px-3 py-1.5 text-white" onClick={() => void resolveConflict(c.key, 'local')}>Meine Version behalten</button>
-          <button className="rounded-lg border border-slate-400 px-3 py-1.5" onClick={() => void resolveConflict(c.key, 'server')}>Server-Version übernehmen</button></div></div>;
+          <button className="rounded-lg border border-zinc-400 px-3 py-1.5" onClick={() => void resolveConflict(c.key, 'server')}>Server-Version übernehmen</button></div></div>;
     })}</div>;
 }

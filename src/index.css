@@ -1,3 +1,24 @@
 @tailwind base; @tailwind components; @tailwind utilities;
+:root { color-scheme: light; } .dark { color-scheme: dark; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+::selection { background: rgb(99 102 241 / .25); }
+:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+button { cursor: pointer; transition: background-color .15s, color .15s, transform .1s; } button:disabled { cursor: not-allowed; }
+button:not([class]), button[class="text-red-600"] { padding: .4rem .7rem; border-radius: .7rem; font-size: .875rem; min-height: 2.25rem; }
+button:not([class]):hover { background: rgb(113 113 122 / .12); } button[class="text-red-600"]:hover { background: rgb(220 38 38 / .1); }
+@media (max-width: 640px) {
+  input:not([type=checkbox]):not([type=file]), select, textarea { font-size: 16px !important; min-height: 2.75rem; }
+  .flex-wrap > input:not([type=checkbox]):not([type=file]), .flex-wrap > select { flex: 1 1 100%; }
+  button:not([class]), button[class="text-red-600"] { min-height: 2.75rem; }
+}
 @keyframes rtfade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes rtpage { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.rt-page { animation: rtpage .25s ease; }
+.recharts-cartesian-axis-tick-value { fill: #71717a; font-size: 12px; }
+.recharts-cartesian-grid line { stroke: rgb(113 113 122 / .18); }
+.recharts-cartesian-axis-line, .recharts-cartesian-axis-tick-line { stroke: transparent; }
+.recharts-default-tooltip { border-radius: 12px !important; border: 1px solid rgb(113 113 122 / .25) !important; box-shadow: 0 8px 24px rgb(0 0 0 / .12) !important; background: #fff !important; }
+.dark .recharts-default-tooltip { background: #18181b !important; color: #fafafa; }
+.rt-dark-chart .recharts-cartesian-axis-tick-value { fill: #fff !important; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 @media print { body * { visibility: hidden; } #wrapped-print, #wrapped-print * { visibility: visible; } #wrapped-print { position: absolute; left: 0; top: 0; width: 100%; } }

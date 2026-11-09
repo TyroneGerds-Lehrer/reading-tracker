@@ -1,9 +1,8 @@
+import { btn, inp } from './ui';
 import { useState } from 'react';
 import { remove, save } from './lib/data';
 import { isValid, type Book, type Session } from './lib/stats';
 
-const inp = 'rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-800';
-const btn = 'rounded-lg bg-indigo-600 px-4 py-2 text-white shadow-sm hover:bg-indigo-700';
 
 // Buchfortschritt = höchste Endseite aller (verbleibenden) Sessions des Buchs, gedeckelt auf die Gesamtseitenzahl.
 export async function syncProgress(bookId: string, rest: Session[], books: Book[]) {
@@ -32,9 +31,9 @@ export function BookEditor({ book, onClose }: { book: Book; onClose: () => void 
     void save('books', { ...book, title: String(f.title).trim(), author: f.author, genre: n(f.genre), isbn: n(f.isbn), cover_url: n(f.cover_url), total_pages: f.total_pages, current_page: f.current_page, publication_year: f.publication_year === '' ? null : f.publication_year, start_date: n(f.start_date), finish_date: n(f.finish_date), notes: n(f.notes) }, book.updated_at);
     onClose();
   };
-  return <div className="space-y-2"><div className="grid gap-2 md:grid-cols-2">{FIELDS.map(([k, l, t]) => <label key={k} className="text-xs text-slate-500">{l}
+  return <div className="space-y-2"><div className="grid gap-2 md:grid-cols-2">{FIELDS.map(([k, l, t]) => <label key={k} className="text-xs text-zinc-500">{l}
     <input className={inp + ' mt-1 w-full'} type={t} value={f[k]} onChange={e => setF({ ...f, [k]: t === 'number' ? (e.target.value === '' ? (k === 'publication_year' ? '' : 0) : +e.target.value) : e.target.value })} /></label>)}</div>
-    <label className="block text-xs text-slate-500">Notizen<textarea className={inp + ' mt-1 w-full'} rows={3} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} /></label>
+    <label className="block text-xs text-zinc-500">Notizen<textarea className={inp + ' mt-1 w-full'} rows={3} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} /></label>
     {err && <p className="text-sm text-red-600">{err}</p>}<div className="flex gap-2"><button className={btn} onClick={submit}>Speichern</button><button onClick={onClose}>Abbrechen</button></div></div>;
 }
 
@@ -52,9 +51,9 @@ export function SessionEditor({ s, books, sessions, onClose }: { s: Session; boo
     await syncProgress(f.book_id, rest, books); if (f.book_id !== s.book_id) await syncProgress(s.book_id, rest, books);
     onClose();
   };
-  const num = (k: 'start_page' | 'end_page' | 'duration_minutes', l: string) => <label className="text-xs text-slate-500">{l}<input className={inp + ' mt-1 w-full'} type="number" min={0} step={k === 'duration_minutes' ? 0.1 : 1} value={f[k]} onChange={e => setF({ ...f, [k]: +e.target.value })} /></label>;
-  return <div className="space-y-2"><div className="grid gap-2 md:grid-cols-3"><label className="text-xs text-slate-500">Buch<select className={inp + ' mt-1 w-full'} value={f.book_id} onChange={e => setF({ ...f, book_id: e.target.value })}>{books.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}</select></label>
-    <label className="text-xs text-slate-500">Datum<input className={inp + ' mt-1 w-full'} type="date" value={f.session_date} onChange={e => setF({ ...f, session_date: e.target.value })} /></label>{num('duration_minutes', 'Minuten')}{num('start_page', 'Startseite')}{num('end_page', 'Endseite')}
-    <label className="text-xs text-slate-500">Notiz<input className={inp + ' mt-1 w-full'} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} /></label></div>
+  const num = (k: 'start_page' | 'end_page' | 'duration_minutes', l: string) => <label className="text-xs text-zinc-500">{l}<input className={inp + ' mt-1 w-full'} type="number" min={0} step={k === 'duration_minutes' ? 0.1 : 1} value={f[k]} onChange={e => setF({ ...f, [k]: +e.target.value })} /></label>;
+  return <div className="space-y-2"><div className="grid gap-2 md:grid-cols-3"><label className="text-xs text-zinc-500">Buch<select className={inp + ' mt-1 w-full'} value={f.book_id} onChange={e => setF({ ...f, book_id: e.target.value })}>{books.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}</select></label>
+    <label className="text-xs text-zinc-500">Datum<input className={inp + ' mt-1 w-full'} type="date" value={f.session_date} onChange={e => setF({ ...f, session_date: e.target.value })} /></label>{num('duration_minutes', 'Minuten')}{num('start_page', 'Startseite')}{num('end_page', 'Endseite')}
+    <label className="text-xs text-zinc-500">Notiz<input className={inp + ' mt-1 w-full'} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} /></label></div>
     {err && <p className="text-sm text-red-600">{err}</p>}<div className="flex gap-2"><button className={btn} onClick={() => void submit()}>Speichern</button><button onClick={onClose}>Abbrechen</button></div></div>;
 }

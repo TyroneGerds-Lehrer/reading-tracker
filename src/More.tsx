@@ -1,17 +1,16 @@
+import { card, inp } from './ui';
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { computeStats, dayKey, isValid, pagesOf, type Book, type Session } from './lib/stats';
 
 import { TZ } from './lib/tz';
-const inp = 'rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-800';
-const card = 'rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-800';
 const MON = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const fmt = (m: number) => `${Math.floor(m / 60)} h ${Math.round(m % 60)} min`;
 const dn = (k: string) => Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10)) / 864e5;
 const topN = (m: Map<string, number>, n = 5) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
 const inc = (m: Map<string, number>, k: string, v = 1) => m.set(k, (m.get(k) ?? 0) + v);
 const Bars = ({ data, k, color = '#6366f1' }: { data: { n: string; [k: string]: string | number }[]; k: string; color?: string }) => <div className="h-44"><ResponsiveContainer><BarChart data={data}><XAxis dataKey="n" /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey={k} fill={color} radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></div>;
-const KV = ({ l, v }: { l: string; v: string | number }) => <div className="flex justify-between border-b border-slate-100 py-1 text-sm dark:border-slate-700"><span className="text-slate-500">{l}</span><span className="font-medium">{v}</span></div>;
+const KV = ({ l, v }: { l: string; v: string | number }) => <div className="flex justify-between border-b border-zinc-100 py-1 text-sm dark:border-zinc-700"><span className="text-zinc-500">{l}</span><span className="font-medium">{v}</span></div>;
 
 function BooksRecords({ books, sessions }: { books: Book[]; sessions: Session[] }) {
   const d = useMemo(() => {
@@ -53,7 +52,7 @@ function Years({ books, sessions }: { books: Book[]; sessions: Session[] }) {
     return { y, s, best: Math.max(...mo) > 0 ? MON[mo.indexOf(Math.max(...mo))] : '–', rating: rated.length ? (rated.reduce((a, b) => a + (b.rating ?? 0), 0) / rated.length).toFixed(1) : '–' };
   });
   if (!rows.length) return <p className={card}>Noch keine Daten.</p>;
-  return <div className="space-y-3"><div className={card + ' overflow-x-auto'}><table className="w-full text-sm"><thead><tr className="text-left text-slate-500"><th>Jahr</th><th>Bücher</th><th>Seiten</th><th>Lesezeit</th><th>Ø Min./Tag</th><th>Streak</th><th>Aktivster Monat</th><th>Ø Bewertung</th></tr></thead>
+  return <div className="space-y-3"><div className={card + ' overflow-x-auto'}><table className="w-full text-sm"><thead><tr className="text-left text-zinc-500"><th>Jahr</th><th>Bücher</th><th>Seiten</th><th>Lesezeit</th><th>Ø Min./Tag</th><th>Streak</th><th>Aktivster Monat</th><th>Ø Bewertung</th></tr></thead>
     <tbody>{rows.map(r => <tr key={r.y}><td className="py-1 font-medium">{r.y}</td><td>{r.s.finishedBooks}</td><td>{r.s.pages}</td><td>{fmt(r.s.minutes)}</td><td>{Math.round(r.s.avgMinutesPerDay)}</td><td>{r.s.longestStreak}</td><td>{r.best}</td><td>{r.rating}</td></tr>)}</tbody></table></div>
     <div className={card}><h3 className="mb-2 font-medium">Seiten pro Jahr</h3><Bars data={[...rows].reverse().map(r => ({ n: String(r.y), Seiten: r.s.pages }))} k="Seiten" /></div></div>;
 }
@@ -68,16 +67,16 @@ function CalHist({ books, sessions }: { books: Book[]; sessions: Session[] }) {
   const L = sel ? by.get(sel) ?? [] : [];
   const hist = useMemo(() => sessions.filter(s => isValid(s) && (!bf || s.book_id === bf) && `${bt(s.book_id)} ${s.notes ?? ''}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (b.start_time ?? b.session_date).localeCompare(a.start_time ?? a.session_date)).slice(0, 200), [sessions, books, q, bf]);
   return <div className="space-y-3"><div className={card}><div className="mb-2 flex items-center justify-between"><button onClick={() => go(-1)}>‹</button><b>{MON[m - 1]} {y}</b><button onClick={() => go(1)}>›</button></div>
-    <div className="grid grid-cols-7 gap-1 text-center text-xs">{['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(w => <div key={w} className="text-slate-500">{w}</div>)}
-      {cells.map((c, i) => { if (!c) return <div key={i} />; const l = by.get(c), min = l?.reduce((a, s) => a + s.duration_minutes, 0) ?? 0; return <button key={c} onClick={() => setSel(c)} className={`rounded-lg py-2 ${l ? (min >= 60 ? 'bg-indigo-500 text-white' : 'bg-indigo-200 dark:bg-indigo-900') : 'bg-slate-100 dark:bg-slate-700'} ${sel === c ? 'ring-2 ring-indigo-600' : ''}`}>{+c.slice(8)}</button>; })}</div>
-    {sel && <div className="mt-3 text-sm"><b>{sel}</b>{L.length === 0 ? <div className="text-slate-500">Nicht gelesen.</div> : <><div>{L.reduce((a, s) => a + pagesOf(s), 0)} Seiten · {fmt(L.reduce((a, s) => a + s.duration_minutes, 0))} · {L.length} Session(s)</div><div>Bücher: {[...new Set(L.map(s => bt(s.book_id)))].join(', ')}</div>{L.filter(s => s.notes).map(s => <div key={s.id} className="text-slate-500">Notiz: {s.notes}</div>)}</>}</div>}</div>
+    <div className="grid grid-cols-7 gap-1 text-center text-xs">{['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(w => <div key={w} className="text-zinc-500">{w}</div>)}
+      {cells.map((c, i) => { if (!c) return <div key={i} />; const l = by.get(c), min = l?.reduce((a, s) => a + s.duration_minutes, 0) ?? 0; return <button key={c} onClick={() => setSel(c)} className={`rounded-lg py-2 ${l ? (min >= 60 ? 'bg-indigo-500 text-white' : 'bg-indigo-200 dark:bg-indigo-900') : 'bg-zinc-100 dark:bg-zinc-700'} ${sel === c ? 'ring-2 ring-indigo-600' : ''}`}>{+c.slice(8)}</button>; })}</div>
+    {sel && <div className="mt-3 text-sm"><b>{sel}</b>{L.length === 0 ? <div className="text-zinc-500">Nicht gelesen.</div> : <><div>{L.reduce((a, s) => a + pagesOf(s), 0)} Seiten · {fmt(L.reduce((a, s) => a + s.duration_minutes, 0))} · {L.length} Session(s)</div><div>Bücher: {[...new Set(L.map(s => bt(s.book_id)))].join(', ')}</div>{L.filter(s => s.notes).map(s => <div key={s.id} className="text-zinc-500">Notiz: {s.notes}</div>)}</>}</div>}</div>
     <div className={card + ' space-y-2'}><h3 className="font-medium">Lesehistorie</h3><div className="flex flex-wrap gap-2"><input className={inp} placeholder="Suchen (Buch, Notiz)…" value={q} onChange={e => setQ(e.target.value)} /><select className={inp} value={bf} onChange={e => setBf(e.target.value)}><option value="">Alle Bücher</option>{books.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}</select></div>
-      {hist.length === 0 && <p className="text-sm text-slate-500">Keine Sessions gefunden.</p>}{hist.map(s => <div key={s.id} className="text-sm">{s.session_date} · {bt(s.book_id)} · {pagesOf(s)} Seiten · {Math.round(s.duration_minutes)} Min.{s.notes ? ` · ${s.notes}` : ''}</div>)}</div></div>;
+      {hist.length === 0 && <p className="text-sm text-zinc-500">Keine Sessions gefunden.</p>}{hist.map(s => <div key={s.id} className="text-sm">{s.session_date} · {bt(s.book_id)} · {pagesOf(s)} Seiten · {Math.round(s.duration_minutes)} Min.{s.notes ? ` · ${s.notes}` : ''}</div>)}</div></div>;
 }
 
 export function More({ books, sessions }: { books: Book[]; sessions: Session[] }) {
   const [t, setT] = useState(0), tabs = ['Bücher & Rekorde', 'Jahresvergleich', 'Kalender & Historie', 'Vergleiche'];
-  return <div className="mt-4 space-y-3"><div className="flex gap-1">{tabs.map((x, i) => <button key={x} onClick={() => setT(i)} className={`rounded-lg px-3 py-1.5 text-sm ${t === i ? 'bg-indigo-600 text-white' : 'hover:bg-slate-200 dark:hover:bg-slate-700'}`}>{x}</button>)}</div>
+  return <div className="mt-4 space-y-3"><div className="flex gap-1">{tabs.map((x, i) => <button key={x} onClick={() => setT(i)} className={`rounded-lg px-3 py-1.5 text-sm ${t === i ? 'bg-indigo-600 text-white' : 'hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}>{x}</button>)}</div>
     {t === 0 && <BooksRecords books={books} sessions={sessions} />}{t === 1 && <Years books={books} sessions={sessions} />}{t === 2 && <CalHist books={books} sessions={sessions} />}{t === 3 && <Compare books={books} sessions={sessions} />}</div>;
 }
 
