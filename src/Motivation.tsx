@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { BookOpen, CalendarClock, Flame, Layers, Lightbulb, Trophy, type LucideIcon } from 'lucide-react';
 import { card } from './ui';
 import { Gamification } from './Challenges';
-import { ReminderCard } from './notify';
+import { PushCard, ReminderCard, pushAvailable } from './notify';
 import { GT, progress, type Goal } from './Extra';
 import { TZ } from './lib/tz';
 import { computeStats, dayKey, rangeFor, type Book, type Session } from './lib/stats';
@@ -56,7 +56,7 @@ export function Motivation({ books, sessions, goals }: { books: Book[]; sessions
     <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-600 p-6 text-white shadow-lg md:p-8"><div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/10" />
       <div className="relative flex items-center gap-4"><Flame className="h-10 w-10 shrink-0" /><div><div className="text-sm uppercase tracking-widest opacity-80">Dein Impuls für heute</div><div className="mt-1 text-lg font-medium md:text-xl">{impulse}</div></div></div></div>
 
-    <ReminderCard />
+    {pushAvailable ? <PushCard /> : <ReminderCard />}
 
     <Sec icon={CalendarClock} title="Prognosen"><div className="grid gap-3 md:grid-cols-2">
       <div className={card}><h3 className="mb-2 font-medium">Wann bist du fertig?</h3>{reading.length === 0 ? <p className="text-sm text-zinc-500">Kein angefangenes Buch mit bekannter Seitenzahl.</p> : !enough || pace <= 0 ? <p className="text-sm text-zinc-500">Noch zu wenig Daten (mind. 5 Lesetage in den letzten 30 Tagen).</p> :

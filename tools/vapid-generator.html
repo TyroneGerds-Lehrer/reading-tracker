@@ -1,0 +1,14 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VAPID-Schlüssel erzeugen</title>
+<style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:2rem auto;padding:0 1rem}code{display:block;word-break:break-all;background:#f4f4f5;padding:.75rem;border-radius:.5rem;margin:.25rem 0 1rem}button{padding:.6rem 1rem;border-radius:.6rem;border:0;background:#4f46e5;color:#fff;font-size:1rem}</style></head><body>
+<h1>VAPID-Schlüssel erzeugen</h1><p>Die Schlüssel werden nur in deinem Browser erzeugt und nirgendwohin gesendet. Den <b>privaten</b> Schlüssel niemals weitergeben oder ins GitHub-Repository legen.</p>
+<button id="go">Schlüssel erzeugen</button><div id="out" hidden><h3>Öffentlicher Schlüssel (VAPID_PUBLIC_KEY und GitHub-Secret VITE_VAPID_PUBLIC_KEY)</h3><code id="pub"></code><h3>Privater Schlüssel (nur Supabase-Secret VAPID_PRIVATE_KEY)</h3><code id="priv"></code></div>
+<script>
+const b64u = b => btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const dec = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+document.getElementById('go').onclick = async () => {
+  const k = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign']);
+  const j = await crypto.subtle.exportKey('jwk', k.privateKey), x = dec(j.x), y = dec(j.y), pub = new Uint8Array(65);
+  pub[0] = 4; pub.set(x, 1); pub.set(y, 33);
+  document.getElementById('pub').textContent = b64u(pub); document.getElementById('priv').textContent = j.d; document.getElementById('out').hidden = false;
+};
+</script></body></html>

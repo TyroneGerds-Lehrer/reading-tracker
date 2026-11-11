@@ -27,3 +27,11 @@ Lokal entwickeln: `.env.example` nach `.env.local` kopieren, Werte eintragen, `n
 
 ## Aufbau
 `src/lib/stats.ts` zentrale Statistik-Engine · `src/lib/data.ts` IndexedDB + Synchronisierung + Konflikte · `src/lib/tz.ts` Zeitzone · `supabase/migrations/` Datenbank + RLS.
+
+## Push-Erinnerungen (optional)
+1. `tools/vapid-generator.html` im Browser öffnen und Schlüssel erzeugen.
+2. `supabase/migrations/002_push_subscriptions.sql` im SQL-Editor ausführen.
+3. Edge Function `send-reminders` (Code: `supabase/functions/send-reminders/index.ts`) anlegen, *Verify JWT* ausschalten.
+4. Secrets in Supabase: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (mailto:…), `CRON_SECRET`.
+5. `supabase/setup/cron_reminders.sql.txt` mit eigenen Werten im SQL-Editor ausführen.
+6. GitHub-Secret `VITE_VAPID_PUBLIC_KEY` anlegen, Deploy neu starten.
