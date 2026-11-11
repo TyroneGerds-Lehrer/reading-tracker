@@ -1,4 +1,4 @@
-import { AlertTriangle, BarChart3, BookOpen, Cloud, CloudOff, LayoutDashboard, LogOut, Menu, Moon, RefreshCw, Settings as SettingsIcon, Sparkles, Sun, Target, Timer, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, BarChart3, BookOpen, Cloud, CloudOff, LayoutDashboard, LogOut, Menu, Moon, RefreshCw, Settings as SettingsIcon, Sparkles, Sun, Target, Timer, Trophy, type LucideIcon } from 'lucide-react';
 import { Empty, Skeleton, btn, card, inp } from './ui';
 import { useEffect, useMemo, useState } from 'react';
 import type { Session as AuthSession } from '@supabase/supabase-js';
@@ -8,13 +8,15 @@ import { getAll, getConflicts, getStatus, remove, save, sync, type SyncStatus } 
 import { Goals, Heat, Settings, type Goal } from './Extra';
 import { Wrapped } from './Wrapped';
 import { More } from './More';
+import { BookSearch } from './BookSearch';
+import { Motivation } from './Motivation';
 import { Dash } from './Dash';
 import { Conflicts } from './Conflicts';
 import { BookEditor, SessionEditor, deleteSession } from './Edit';
 import { computeStats, dayKey, insights, rangeFor, type Book, type Session } from './lib/stats';
 
 import { TZ } from './lib/tz';
-const NAV = ['Dashboard', 'Meine Bücher', 'Lesesessions', 'Statistiken', 'Leseziele', 'Reading Wrapped', 'Einstellungen'];
+const NAV = ['Dashboard', 'Meine Bücher', 'Lesesessions', 'Statistiken', 'Leseziele', 'Motivation', 'Reading Wrapped', 'Einstellungen'];
 const STATUS_TXT: Record<SyncStatus, string> = { synced: 'Synchronisiert', syncing: 'Synchronisierung läuft', offline: 'Offline', failed: 'Synchronisierung fehlgeschlagen' };
 const BOOK_STATUS: Record<string, string> = { wishlist: 'Leseliste', reading: 'Aktuell am Lesen', paused: 'Pausiert', abandoned: 'Abgebrochen', finished: 'Abgeschlossen' };
 const fmtMin = (m: number) => `${Math.floor(m / 60)} h ${Math.round(m % 60)} min`;
@@ -66,7 +68,7 @@ function Books({ books, uid }: { books: Book[]; uid: string }) {
   const add = () => { if (!f.title.trim()) return; void save('books', { id: crypto.randomUUID(), user_id: uid, ...f, title: f.title.trim(), genre: f.genre || null, current_page: 0, status: 'wishlist', rating: null }); setF({ title: '', author: '', genre: '', total_pages: 0 }); };
   const upd = (b: Book, p: Partial<Book>) => { const n = { ...b, ...p }; if (p.status === 'finished') { n.finish_date = dayKey(new Date(), TZ); if (n.total_pages) n.current_page = n.total_pages; } void save('books', n, b.updated_at); };
   const list = books.filter(b => (!st || b.status === st) && `${b.title} ${b.author}`.toLowerCase().includes(q.toLowerCase()));
-  return <div className="space-y-4"><div className={card + ' flex flex-wrap gap-2'}>
+  return <div className="space-y-4"><BookSearch books={books} uid={uid} /><div className={card + ' flex flex-wrap gap-2'}>
     <input className={inp} placeholder="Titel" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} /><input className={inp} placeholder="Autor" value={f.author} onChange={e => setF({ ...f, author: e.target.value })} />
     <input className={inp} placeholder="Genre" value={f.genre} onChange={e => setF({ ...f, genre: e.target.value })} /><input className={inp + ' w-28'} type="number" min={0} placeholder="Seiten" value={f.total_pages || ''} onChange={e => setF({ ...f, total_pages: Math.max(0, +e.target.value) })} />
     <button className={btn} onClick={add}>Buch hinzufügen</button></div>
@@ -125,7 +127,7 @@ function Statistics({ books, sessions }: { books: Book[]; sessions: Session[] })
     {pick && <div className={card + ' text-sm'}><b>{pick}</b>{sessions.filter(x => x.session_date === pick).map(x => <div key={x.id}>{books.find(b => b.id === x.book_id)?.title ?? '(gelöschtes Buch)'} · S. {x.start_page}–{x.end_page} · {Math.round(x.duration_minutes)} Min.</div>)}</div>}<div className={card}><h3 className="mb-2 font-medium">Lesezeit nach Wochentag (Min. gesamt)</h3><div className="h-48"><ResponsiveContainer><BarChart data={s.weekday.map((v, i) => ({ d: wd[i], minutes: Math.round(v.minutes) }))}><XAxis dataKey="d" /><YAxis /><Tooltip /><Bar dataKey="minutes" fill="#8b5cf6" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></div></div></div>;
 }
 
-const NAVI: LucideIcon[] = [LayoutDashboard, BookOpen, Timer, BarChart3, Target, Sparkles, SettingsIcon];
+const NAVI: LucideIcon[] = [LayoutDashboard, BookOpen, Timer, BarChart3, Target, Trophy, Sparkles, SettingsIcon];
 const SYNC: Record<SyncStatus, { Icon: LucideIcon; cls: string }> = {
   synced: { Icon: Cloud, cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' },
   syncing: { Icon: RefreshCw, cls: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300' },
@@ -145,7 +147,7 @@ export default function App() {
   const toggleTheme = () => { const n = !dark; setDark(n); localStorage.setItem('rt-theme', n ? 'dark' : 'light'); void supabase.from('profiles').update({ preferred_theme: n ? 'dark' : 'light' }).eq('id', uid); };
   const { Icon: SIcon, cls } = SYNC[status];
   const pill = <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cls}`} title="Synchronisierungsstatus"><SIcon className={`h-3.5 w-3.5 ${status === 'syncing' ? 'animate-spin' : ''}`} />{STATUS_TXT[status]}</span>;
-  const confBtn = conflicts > 0 && <button className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" onClick={() => go(6)}>{conflicts} Konflikt(e)</button>;
+  const confBtn = conflicts > 0 && <button className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" onClick={() => go(7)}>{conflicts} Konflikt(e)</button>;
   const logo = <div className="flex items-center gap-2.5"><div className="rounded-xl bg-indigo-600 p-2 text-white shadow-md shadow-indigo-600/30"><BookOpen className="h-4 w-4" /></div><span className="font-semibold tracking-tight">Reading Tracker</span></div>;
   const side = (i: number) => { const I = NAVI[i]; return <button key={i} onClick={() => go(i)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${tab === i ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/70'}`}><I className="h-[18px] w-[18px]" />{NAV[i]}</button>; };
   const bot = (i: number, label: string) => { const I = NAVI[i]; return <button key={i} onClick={() => go(i)} className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${tab === i ? 'text-indigo-600 dark:text-indigo-300' : 'text-zinc-500'}`}><I className="h-5 w-5" />{label}</button>; };
@@ -153,15 +155,15 @@ export default function App() {
   const outBtn = <button onClick={() => supabase.auth.signOut()} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/70"><LogOut className="h-[18px] w-[18px]" />Abmelden</button>;
   return <div className="min-h-screen md:pl-64">
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col gap-1 border-r border-zinc-200 bg-white/80 p-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80 md:flex"><div className="mb-5 px-1 pt-1">{logo}</div>
-      {[0, 1, 2, 3, 4, 5, 6].map(side)}<div className="mt-auto flex flex-col gap-1"><div className="flex flex-wrap items-center gap-2 px-1 pb-2">{pill}{confBtn}</div>{themeBtn}{outBtn}</div></aside>
+      {[0, 1, 2, 3, 4, 5, 6, 7].map(side)}<div className="mt-auto flex flex-col gap-1"><div className="flex flex-wrap items-center gap-2 px-1 pb-2">{pill}{confBtn}</div>{themeBtn}{outBtn}</div></aside>
     <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-zinc-200 bg-white/85 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/85 md:hidden" style={{ paddingTop: 'max(.75rem, env(safe-area-inset-top))' }}>{logo}<div className="flex items-center gap-2">{confBtn}{pill}</div></header>
     <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-8"><h1 className="mb-5 text-2xl font-semibold tracking-tight md:text-3xl">{NAV[tab]}</h1>
       <div key={tab} className="rt-page">{!ready ? <Skeleton /> : <>
         {tab === 0 && <Dash books={books} sessions={sessions} goals={goals} />}{tab === 1 && <Books books={books} uid={uid} />}{tab === 2 && <Sessions books={books} sessions={sessions} uid={uid} />}
         {tab === 3 && <><Statistics books={books} sessions={sessions} /><Heat books={books} sessions={sessions} /><More books={books} sessions={sessions} /></>}
-        {tab === 4 && <Goals goals={goals} books={books} sessions={sessions} uid={uid} />}{tab === 5 && <Wrapped books={books} sessions={sessions} />}
-        {tab === 6 && <><Conflicts /><Settings books={books} sessions={sessions} goals={goals} uid={uid} /></>}</>}</div></main>
-    {more && <div className="fixed inset-0 z-30 md:hidden" onClick={() => setMore(false)}><div className="absolute inset-x-3 bottom-20 flex flex-col gap-1 rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl dark:border-zinc-800 dark:bg-zinc-900" onClick={e => e.stopPropagation()}>{[4, 5, 6].map(side)}{themeBtn}{outBtn}</div></div>}
+        {tab === 4 && <Goals goals={goals} books={books} sessions={sessions} uid={uid} />}{tab === 5 && <Motivation books={books} sessions={sessions} goals={goals} />}{tab === 6 && <Wrapped books={books} sessions={sessions} />}
+        {tab === 7 && <><Conflicts /><Settings books={books} sessions={sessions} goals={goals} uid={uid} /></>}</>}</div></main>
+    {more && <div className="fixed inset-0 z-30 md:hidden" onClick={() => setMore(false)}><div className="absolute inset-x-3 bottom-20 flex flex-col gap-1 rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl dark:border-zinc-800 dark:bg-zinc-900" onClick={e => e.stopPropagation()}>{[4, 5, 6, 7].map(side)}{themeBtn}{outBtn}</div></div>}
     <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 md:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {bot(0, 'Start')}{bot(1, 'Bücher')}{bot(2, 'Sessions')}{bot(3, 'Statistik')}
       <button onClick={() => setMore(!more)} className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${tab >= 4 || more ? 'text-indigo-600 dark:text-indigo-300' : 'text-zinc-500'}`}><Menu className="h-5 w-5" />Mehr</button></nav></div>;
