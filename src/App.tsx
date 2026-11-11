@@ -10,6 +10,7 @@ import { Wrapped } from './Wrapped';
 import { More } from './More';
 import { BookSearch } from './BookSearch';
 import { Motivation } from './Motivation';
+import { useReminder } from './notify';
 import { Dash } from './Dash';
 import { Conflicts } from './Conflicts';
 import { BookEditor, SessionEditor, deleteSession } from './Edit';
@@ -138,6 +139,7 @@ const SYNC: Record<SyncStatus, { Icon: LucideIcon; cls: string }> = {
 export default function App() {
   const [auth, setAuth] = useState<AuthSession | null | undefined>(undefined), [tab, setTab] = useState(0), [more, setMore] = useState(false), [dark, setDark] = useState(localStorage.getItem('rt-theme') ? localStorage.getItem('rt-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
   const { books, sessions, goals, status, conflicts, ready } = useLive();
+  useReminder(sessions);
   useEffect(() => { supabase.auth.getSession().then(r => setAuth(r.data.session)); const { data } = supabase.auth.onAuthStateChange((_e, s) => { setAuth(s); if (s) void sync(); }); return () => data.subscription.unsubscribe(); }, []);
   useEffect(() => { document.documentElement.classList.toggle('dark', dark); }, [dark]);
   useEffect(() => { if (!auth) return; void supabase.from('profiles').select('timezone,preferred_theme').eq('id', auth.user.id).maybeSingle().then(({ data }) => { if (!data) return; if (data.preferred_theme) { localStorage.setItem('rt-theme', data.preferred_theme); setDark(data.preferred_theme === 'dark'); } if (data.timezone && data.timezone !== TZ) { localStorage.setItem('rt-tz', data.timezone); location.reload(); } }); }, [auth?.user.id]);

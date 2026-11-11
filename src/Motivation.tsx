@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { BookOpen, CalendarClock, Flame, Layers, Lightbulb, Trophy, type LucideIcon } from 'lucide-react';
 import { card } from './ui';
+import { Gamification } from './Challenges';
+import { ReminderCard } from './notify';
 import { GT, progress, type Goal } from './Extra';
 import { TZ } from './lib/tz';
 import { computeStats, dayKey, rangeFor, type Book, type Session } from './lib/stats';
@@ -54,6 +56,8 @@ export function Motivation({ books, sessions, goals }: { books: Book[]; sessions
     <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-600 p-6 text-white shadow-lg md:p-8"><div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/10" />
       <div className="relative flex items-center gap-4"><Flame className="h-10 w-10 shrink-0" /><div><div className="text-sm uppercase tracking-widest opacity-80">Dein Impuls für heute</div><div className="mt-1 text-lg font-medium md:text-xl">{impulse}</div></div></div></div>
 
+    <ReminderCard />
+
     <Sec icon={CalendarClock} title="Prognosen"><div className="grid gap-3 md:grid-cols-2">
       <div className={card}><h3 className="mb-2 font-medium">Wann bist du fertig?</h3>{reading.length === 0 ? <p className="text-sm text-zinc-500">Kein angefangenes Buch mit bekannter Seitenzahl.</p> : !enough || pace <= 0 ? <p className="text-sm text-zinc-500">Noch zu wenig Daten (mind. 5 Lesetage in den letzten 30 Tagen).</p> :
         reading.map(b => { const days = Math.ceil((b.total_pages - b.current_page) / pace); return <div key={b.id} className="mb-2 text-sm"><div className="font-medium">{b.title}</div><div className="text-zinc-500">{days > 730 ? 'In mehr als 2 Jahren' : `Voraussichtlich am ${de(iso(d.t + days))}`} ({b.total_pages - b.current_page} Seiten offen)</div></div>; })}
@@ -61,13 +65,7 @@ export function Motivation({ books, sessions, goals }: { books: Book[]; sessions
       <div className={card}><h3 className="mb-2 font-medium">Ziele im Check</h3>{gf.length === 0 ? <p className="text-sm text-zinc-500">Lege unter „Leseziele“ ein Jahres- oder Monatsziel für Seiten bzw. Bücher an, dann erscheint hier eine Hochrechnung.</p> :
         gf.map(r => <div key={r.g.id} className="mb-3 text-sm"><div className="flex justify-between font-medium"><span>{GT[r.g.goal_type]}</span><span>{r.pct} %</span></div><Bar pct={r.pct} ok={r.ok} /><div className="mt-1 text-zinc-500">{r.text}</div></div>)}</div></div></Sec>
 
-    <Sec icon={Trophy} title="Challenges"><div className="grid gap-3 md:grid-cols-3">{ch.map(([p, n, v, g, u]) => <div key={n} className={card}><div className="text-xs font-medium uppercase tracking-wide text-zinc-500">{p}s-Challenge</div><div className="mt-1 font-medium">{n}</div>
-      <div className="mt-1 text-sm text-zinc-500">{v >= g ? 'Geschafft!' : `${v} / ${g} ${u}`}</div><Bar pct={v / g * 100} ok={v >= g} /></div>)}</div>
-      <p className="text-xs text-zinc-500">Wochen-Challenges laufen von Montag bis Sonntag, Monats-Challenges über den aktuellen Kalendermonat. Alles wird automatisch aus deinen Sessions berechnet.</p></Sec>
-
-    <Sec icon={Trophy} title="Abzeichen"><div className="grid grid-cols-2 gap-3 md:grid-cols-4">{badges.map(b => { const on = b.v >= b.g; return <div key={b.name} className={card + ` flex items-center gap-3 !p-3 ${on ? '' : 'opacity-60'}`}>
-      <div className={`rounded-xl p-2 ${on ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300' : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800'}`}><b.I className="h-5 w-5" /></div>
-      <div className="min-w-0 text-sm"><div className="truncate font-medium">{b.name}</div><div className="text-xs text-zinc-500">{on ? 'Freigeschaltet' : `${b.v.toLocaleString('de-DE')} / ${b.g.toLocaleString('de-DE')}`}</div></div></div>; })}</div></Sec>
+    <Gamification books={books} sessions={sessions} />
 
     <Sec icon={Lightbulb} title="Empfehlungen"><div className="grid gap-3 md:grid-cols-2">
       <div className={card}><h3 className="mb-2 font-medium">Als Nächstes lesen</h3>{wish.length === 0 ? <p className="text-sm text-zinc-500">Deine Leseliste ist leer. Suche unter „Meine Bücher“ online nach neuen Büchern.</p> :
