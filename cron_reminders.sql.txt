@@ -1,0 +1,11 @@
+-- Im Supabase SQL-Editor ausführen, NACHDEM die Platzhalter ersetzt wurden:
+--   DEIN-PROJEKT  = https://ykupvvsjaehactpzxjur
+--   DEIN-GEHEIMNIS = fs83jfo38ww2cols29fk34
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+select cron.schedule('send-reading-reminders', '*/15 * * * *', $$
+  select net.http_post(
+    url := 'https://DEIN-PROJEKT.supabase.co/functions/v1/send-reminders',
+    headers := '{"Content-Type":"application/json","x-cron-secret":"DEIN-GEHEIMNIS"}'::jsonb,
+    body := '{}'::jsonb) $$);
+-- Ausschalten: select cron.unschedule('send-reading-reminders');
