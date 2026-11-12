@@ -1,0 +1,20 @@
+-- LASTTEST: erzeugt 10 Testbücher und 5.000 Sessions für DEIN Konto (Titel beginnen mit "[Lasttest]").
+-- 1) User-ID ermitteln:   select id, email from auth.users;
+-- 2) Unten DEINE-USER-ID ersetzen (nur in der ersten Zeile), dann alles zusammen ausführen.
+select set_config('app.uid', 'DEINE-USER-ID', false);
+
+insert into public.books (user_id, title, author, genre, total_pages, current_page, status)
+select current_setting('app.uid')::uuid, '[Lasttest] Buch ' || g, 'Autor ' || (g % 5),
+       (array['Roman','Krimi','Sachbuch','Fantasy'])[1 + g % 4], 5000, 0, 'reading'
+from generate_series(1, 10) g;
+
+insert into public.reading_sessions (user_id, book_id, session_date, start_time, end_time, duration_minutes, start_page, end_page)
+select u, ids[1 + (g % 10)], (ts at time zone 'Europe/Berlin')::date, ts, ts + make_interval(mins => d), d, sp, sp + p
+from (select current_setting('app.uid')::uuid as u) uu,
+     (select array_agg(id) as ids from public.books where user_id = current_setting('app.uid')::uuid and title like '[Lasttest]%') b,
+     generate_series(1, 5000) g,
+     lateral (select now() - random() * interval '1825 days' as ts, 10 + floor(random() * 50)::int as d,
+                     floor(random() * 4000)::int as sp, 5 + floor(random() * 40)::int as p where g > 0) x;
+
+-- AUFRÄUMEN (separat ausführen, wenn der Test vorbei ist; löscht die Sessions automatisch mit):
+-- delete from public.books where user_id = 'DEINE-USER-ID' and title like '[Lasttest]%';

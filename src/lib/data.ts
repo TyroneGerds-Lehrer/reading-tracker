@@ -14,15 +14,16 @@ export async function save(t: T, row: any, base?: string | null) {
   const d = await dbp, prev = await d.get('outbox', t + row.id);
   await d.put(t, row);
   await d.put('outbox', { key: t + row.id, t, op: 'upsert', row, base: prev ? prev.base : base ?? null }); // Basisversion bleibt erhalten
-  window.dispatchEvent(new Event('rt-data')); void sync();
+  window.dispatchEvent(new Event('rt-data')); void sync(true);
 }
 export async function remove(t: T, id: string) {
   const d = await dbp; await d.delete(t, id);
   await d.put('outbox', { key: t + id, t, op: 'delete', row: { id }, base: null });
-  window.dispatchEvent(new Event('rt-data')); void sync();
+  window.dispatchEvent(new Event('rt-data')); void sync(true);
 }
 let running = false;
-export async function sync() {
+let lastPull = 0;
+export async function sync(light = false) {
   if (running) return; if (!navigator.onLine) return setStatus('offline');
   running = true; setStatus('syncing');
   try {
@@ -38,10 +39,12 @@ export async function sync() {
       }
       await d.delete('outbox', o.key);
     }
-    for (const t of ['books', 'reading_sessions', 'reading_goals'] as T[]) {
-      const { data, error } = await supabase.from(t).select('*'); if (error) throw error;
+    const doPull = !light || Date.now() - lastPull > 60000; if (doPull) lastPull = Date.now(); // lokale Änderungen lösen nur Senden aus, vollständiges Laden höchstens alle 60 s
+    for (const t of (doPull ? ['books', 'reading_sessions', 'reading_goals'] : []) as T[]) {
+      const data: any[] = []; // seitenweise laden (Supabase liefert max. 1000 Zeilen pro Abfrage)
+      for (let from = 0; ; from += 1000) { const { data: part, error } = await supabase.from(t).select('*').order('id').range(from, from + 999); if (error) throw error; data.push(...(part ?? [])); if (!part || part.length < 1000) break; }
       const pending = new Set((await d.getAllKeys('outbox')) as string[]), conflicts = new Set((await d.getAllKeys('conflicts')) as string[]), ids = new Set<string>();
-      for (const r of data ?? []) { ids.add(r.id); if (!pending.has(t + r.id) && !conflicts.has(t + r.id)) await d.put(t, r); }
+      const tx = d.transaction(t, 'readwrite'); for (const r of data) { ids.add(r.id); if (!pending.has(t + r.id) && !conflicts.has(t + r.id)) void tx.store.put(r); } await tx.done; // eine Transaktion statt Tausender Einzelschreibvorgänge
       for (const l of (await d.getAllKeys(t)) as string[]) if (!ids.has(l) && !pending.has(t + l)) await d.delete(t, l);
     }
     setStatus('synced');
@@ -56,5 +59,5 @@ export async function resolveConflict(key: string, choice: 'local' | 'server') {
   if (choice === 'local') await d.put('outbox', { key, t: c.t, op: 'upsert', row: c.local, base: c.serverUpdatedAt }); // erneut senden, Basis = aktuelle Serverversion
   else { const { data } = await supabase.from(c.t).select('*').eq('id', c.local.id).maybeSingle(); if (data) await d.put(c.t, data); else await d.delete(c.t, c.local.id); }
   await d.delete('conflicts', key);
-  window.dispatchEvent(new Event('rt-data')); void sync();
+  window.dispatchEvent(new Event('rt-data')); void sync(true);
 }
