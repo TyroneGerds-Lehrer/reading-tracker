@@ -26,7 +26,7 @@ Lokal entwickeln: `.env.example` nach `.env.local` kopieren, Werte eintragen, `n
 - Supabase Free enthält keine automatische Wiederherstellung: regelmäßig exportieren.
 
 ## Aufbau
-`src/lib/stats.ts` zentrale Statistik-Engine · `src/lib/data.ts` IndexedDB + Synchronisierung + Konflikte · `src/lib/tz.ts` Zeitzone · `supabase/migrations/` Datenbank + RLS.
+`src/lib/stats.ts` zentrale Statistik-Engine · `src/lib/data.ts` IndexedDB + Synchronisierung + Konflikte · `src/lib/tz.ts` Zeitzone · `src/lib/music.ts` Hintergrundmusik für Reading Wrapped (im Browser erzeugt, ein-/ausschaltbar) · `supabase/migrations/` Datenbank + RLS.
 
 ## Push-Erinnerungen (optional)
 1. `tools/vapid-generator.html` im Browser öffnen und Schlüssel erzeugen.
