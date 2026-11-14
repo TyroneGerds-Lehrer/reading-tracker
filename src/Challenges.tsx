@@ -50,7 +50,7 @@ export function Gamification({ books, sessions }: { books: Book[]; sessions: Ses
       { t: 'Bücher', I: BookOpen, v: finished.length, th: th([1, 3, 5, 10, 25, 50, 100], 1.5), u: 'Bücher' }, { t: 'Lesezeit', I: Clock, v: Math.floor(v.reduce((a, s) => a + s.duration_minutes, 0) / 60), th: th([5, 10, 25, 50, 100, 250, 500, 1000], 1.5), u: 'Std.' },
       { t: 'Lesetage', I: CalendarDays, v: days.length, th: th([7, 30, 60, 100, 200, 365, 500], 1.5), u: 'Tage' }, { t: 'Sessions', I: Repeat, v: v.length, th: th([10, 25, 50, 100, 250, 500, 1000], 1.5), u: 'Sessions' },
       { t: 'Marathon', I: Zap, v: Math.round(Math.max(0, ...v.map(s => s.duration_minutes))), th: th([30, 60, 90, 120, 180, 240, 300], 1.3), u: 'Min. am Stück' }, { t: 'Tagesrekord', I: TrendingUp, v: Math.max(0, ...[...byDay.values()].map(a => a.pages)), th: th([25, 50, 75, 100, 150, 200, 300], 1.3), u: 'Seiten an einem Tag' },
-      { t: 'Entdecker', I: Compass, v: new Set(books.map(b => b.genre).filter(Boolean)).size, th: th([2, 3, 5, 8, 12, 20], 1.4), u: 'Genres' }, { t: 'Autoren', I: Users, v: new Set(finished.map(b => b.author).filter(Boolean)).size, th: th([3, 5, 10, 25, 50, 100], 1.5), u: 'Autoren' },
+      { t: 'Entdecker', I: Compass, v: new Set(books.map(b => b.genre).filter(Boolean)).size, th: th([2, 3, 5, 8, 12, 20], 1.4), u: 'Genres' }, { t: 'Autor*innen', I: Users, v: new Set(finished.map(b => b.author).filter(Boolean)).size, th: th([3, 5, 10, 25, 50, 100], 1.5), u: 'Autor*innen' },
       { t: 'Challenge-Meister', I: Medal, v: done, th: th([5, 15, 30, 60, 100, 200], 1.5), u: 'Challenges' }];
     return { wk, ws, cur, last, months, fam };
   }, [sessions, books]);

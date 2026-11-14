@@ -34,7 +34,7 @@ function BooksRecords({ books, sessions }: { books: Book[]; sessions: Session[] 
     <KV l="Ø Tage bis zum Abschluss" v={d.dur.length ? Math.round(d.dur.reduce((a, b) => a + b, 0) / d.dur.length) : '–'} />
     <h4 className="mt-3 text-sm font-medium">Meiste Lesestunden</h4>{t5('min').map(e => <KV key={e.b.id} l={e.b.title} v={fmt(e.min)} />)}
     <h4 className="mt-3 text-sm font-medium">Meiste Sessions</h4>{t5('n').map(e => <KV key={e.b.id} l={e.b.title} v={e.n} />)}
-    <h4 className="mt-3 text-sm font-medium">Meistgelesene Autoren (Seiten)</h4>{d.auth.map(([a, n]) => <KV key={a} l={a} v={n} />)}</div>
+    <h4 className="mt-3 text-sm font-medium">Meistgelesene Autor*innen (Seiten)</h4>{d.auth.map(([a, n]) => <KV key={a} l={a} v={n} />)}</div>
     <div className="space-y-3"><div className={card}><h3 className="mb-2 font-medium">Persönliche Rekorde</h3>
       <KV l="Meiste Seiten an einem Tag" v={d.all.record.maxPagesDay ? `${d.all.record.maxPagesDay.pages} (${d.all.record.maxPagesDay.day})` : '–'} /><KV l="Längste Session" v={d.all.record.longestSession ? `${Math.round(d.all.record.longestSession)} Min.` : '–'} />
       <KV l="Längster Streak" v={`${d.all.longestStreak} Tage`} /><KV l="Meiste Bücher in einem Monat" v={d.mb ? `${d.mb[1]} (${ym(d.mb[0])})` : '–'} /><KV l="Meiste Seiten in einem Monat" v={d.mp ? `${d.mp[1]} (${ym(d.mp[0])})` : '–'} />
