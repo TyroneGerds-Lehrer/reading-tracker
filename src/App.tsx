@@ -161,7 +161,7 @@ export default function App() {
     <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-zinc-200 bg-white/85 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/85 md:hidden" style={{ paddingTop: 'max(.75rem, env(safe-area-inset-top))' }}>{logo}<div className="flex items-center gap-2">{confBtn}{pill}</div></header>
     <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-8"><h1 className="mb-5 text-2xl font-semibold tracking-tight md:text-3xl">{NAV[tab]}</h1>
       <div key={tab} className="rt-page">{!ready ? <Skeleton /> : <>
-        {tab === 0 && <Dash books={books} sessions={sessions} goals={goals} />}{tab === 1 && <Books books={books} uid={uid} />}{tab === 2 && <Sessions books={books} sessions={sessions} uid={uid} />}
+        {tab === 0 && <Dash books={books} sessions={sessions} goals={goals} onWrapped={() => go(6)} />}{tab === 1 && <Books books={books} uid={uid} />}{tab === 2 && <Sessions books={books} sessions={sessions} uid={uid} />}
         {tab === 3 && <><Statistics books={books} sessions={sessions} /><Heat books={books} sessions={sessions} /><More books={books} sessions={sessions} /></>}
         {tab === 4 && <Goals goals={goals} books={books} sessions={sessions} uid={uid} />}{tab === 5 && <Motivation books={books} sessions={sessions} goals={goals} />}{tab === 6 && <Wrapped books={books} sessions={sessions} />}
         {tab === 7 && <><Conflicts /><Settings books={books} sessions={sessions} goals={goals} uid={uid} /></>}</>}</div></main>

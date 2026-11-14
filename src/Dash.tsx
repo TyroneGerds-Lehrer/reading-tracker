@@ -1,7 +1,8 @@
 import { card } from './ui';
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Sparkles } from 'lucide-react';
+import { wrappedStatus } from './Wrapped';
 import { Empty } from './ui';
 import { GT, PERIODS, progress, type Goal } from './Extra';
 import { computeStats, dayKey, insights, isValid, pagesOf, rangeFor, type Book, type Session } from './lib/stats';
@@ -15,7 +16,7 @@ const Prog = ({ pct }: { pct: number }) => <div className="mt-1 h-2 rounded bg-z
 // DST-sicher: Tage per UTC-Datumsarithmetik auf dem lokalen Tagesschlüssel
 const lastDays = (n: number) => { const [y, m, d] = dayKey(new Date(), TZ).split('-').map(Number); return Array.from({ length: n }, (_, i) => new Date(Date.UTC(y, m - 1, d - (n - 1 - i))).toISOString().slice(0, 10)); };
 
-export function Dash({ books, sessions, goals }: { books: Book[]; sessions: Session[]; goals: Goal[] }) {
+export function Dash({ books, sessions, goals, onWrapped }: { books: Book[]; sessions: Session[]; goals: Goal[]; onWrapped?: () => void }) {
   const [p, setP] = useState(localStorage.getItem('rt-period') ?? '30'), compact = localStorage.getItem('rt-view') === 'compact';
   const all = useMemo(() => computeStats(sessions, books, null, TZ), [sessions, books]);
   const per = useMemo(() => computeStats(sessions, books, rangeFor(p, TZ), TZ), [p, sessions, books]);
@@ -29,8 +30,11 @@ export function Dash({ books, sessions, goals }: { books: Book[]; sessions: Sess
   const bt = (id: string) => books.find(b => b.id === id)?.title ?? '(gelöschtes Buch)';
   const reading = books.filter(b => b.status === 'reading'), done = books.filter(b => b.status === 'finished').sort((a, b) => (b.finish_date ?? '').localeCompare(a.finish_date ?? '')).slice(0, 5);
   const last = sessions.filter(isValid).sort((a, b) => (b.start_time ?? b.session_date).localeCompare(a.start_time ?? a.session_date)).slice(0, 5);
+  const wst = wrappedStatus(dayKey(new Date(), TZ)), hasYear = sessions.some(s => s.session_date.startsWith(String(wst.year)));
+  const teaser = hasYear && (wst.open || wst.left <= 14) ? <button onClick={wst.open ? onWrapped : undefined} className={`rt-pop relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-5 text-left text-white shadow-lg md:p-7 ${wst.open ? 'transition hover:shadow-2xl' : 'cursor-default'}`}><div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" /><Sparkles className="relative mb-2 h-6 w-6" /><div className="relative text-xs uppercase tracking-[.2em] opacity-80">Reading Wrapped {wst.year}</div><div className="relative mt-1 text-xl font-semibold md:text-2xl">{wst.open ? 'Dein Lesejahr ist da – jetzt ansehen' : `Dein Rückblick erscheint in ${wst.left} Tag${wst.left === 1 ? '' : 'en'}`}</div></button> : null;
   const gl = goals.slice(0, 4).map(g => { const v = progress(g, sessions, books); return { g, v, pct: Math.round(v / g.target_value * 100) }; });
   return <div className="space-y-4">
+    {teaser}
     {!sessions.length && <Empty icon={BookOpen} title="Noch keine Lesesessions" text="Lege ein Buch an und erfasse deine erste Session – dann erscheinen hier deine Statistiken." />}
     <div className="flex items-center gap-2 text-sm"><span>Zeitraum:</span><select className="rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900" value={p} onChange={e => setP(e.target.value)}>{PERIODS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

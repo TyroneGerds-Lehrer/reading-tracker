@@ -22,3 +22,10 @@ button:not([class]):hover { background: rgb(113 113 122 / .12); } button[class="
 .rt-dark-chart .recharts-cartesian-axis-tick-value { fill: #fff !important; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 @media print { body * { visibility: hidden; } #wrapped-print, #wrapped-print * { visibility: visible; } #wrapped-print { position: absolute; left: 0; top: 0; width: 100%; } }
+@keyframes rtpop { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: none; } }
+@keyframes rtrise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes rtgrow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes rtcell { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rtbar { from { width: 0; } to { width: 100%; } }
+.rt-pop { animation: rtpop .7s cubic-bezier(.2, .9, .3, 1.2) both; } .rt-rise { animation: rtrise .6s ease both; }
+.rt-grow { transform-origin: bottom; animation: rtgrow .8s cubic-bezier(.2, .8, .2, 1) both; } .rt-cell { animation: rtcell .5s ease both; }
