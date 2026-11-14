@@ -5,6 +5,7 @@ import { Gamification } from './Challenges';
 import { PushCard, ReminderCard, pushAvailable } from './notify';
 import { GT, progress, type Goal } from './Extra';
 import { TZ } from './lib/tz';
+import { personalize } from './lib/personal';
 import { computeStats, dayKey, rangeFor, type Book, type Session } from './lib/stats';
 
 const dn = (k: string) => Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10)) / 864e5;
@@ -20,8 +21,7 @@ export function Motivation({ books, sessions, goals }: { books: Book[]; sessions
   }, [sessions, books]);
   const pace = d.m30.avgPagesPerDay, enough = d.m30.activeDays >= 5, y = +d.today.slice(0, 4), m = +d.today.slice(5, 7), streak = d.all.currentStreak;
 
-  const impulse = d.now.pages > 0 ? `Heute schon ${d.now.pages} Seiten gelesen${streak > 1 ? ` – dein Streak: ${streak} Tage` : ''}. Stark!`
-    : streak > 0 ? `Dein Streak von ${streak} Tag${streak > 1 ? 'en' : ''} endet heute, wenn du nicht liest. Schon 10 Minuten halten ihn am Leben.` : 'Starte heute mit einer kurzen Lesesession und beginne einen neuen Streak.';
+  const impulse = useMemo(() => { const p = personalize(sessions, goals, TZ); return `${p.headline} ${p.text}`; }, [sessions, goals]);
 
   const reading = books.filter(b => b.status === 'reading' && b.total_pages > b.current_page);
   const endYear = Date.UTC(y, 11, 31) / 864e5, endMonth = Date.UTC(y, m, 0) / 864e5, startYear = Date.UTC(y, 0, 1) / 864e5;

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { TZ } from './lib/tz';
 import { supabase } from './lib/supabase';
-import { computeStats, dayKey, type Session } from './lib/stats';
+import { dayKey, type Session } from './lib/stats';
+import { personalize, type GoalLike } from './lib/personal';
 import { btn, card, inp } from './ui';
 
 const supported = () => 'Notification' in window && 'serviceWorker' in navigator;
@@ -12,7 +13,7 @@ async function show(title: string, body: string) {
 }
 
 // Lokale Erinnerung: erscheint zur gewählten Uhrzeit (bzw. beim nächsten Öffnen danach), falls heute noch nicht gelesen wurde.
-export function useReminder(sessions: Session[]) {
+export function useReminder(sessions: Session[], goals: GoalLike[]) {
   useEffect(() => {
     if (localStorage.getItem('rt-remind')) void registerSW();
     const tick = () => {
@@ -20,13 +21,12 @@ export function useReminder(sessions: Session[]) {
       const now = new Date(), hm = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now), today = dayKey(now, TZ);
       if (hm < t || localStorage.getItem('rt-remind-last') === today) return;
       localStorage.setItem('rt-remind-last', today);
-      if (computeStats(sessions, [], { from: today, to: today }, TZ).pages > 0) return;
-      const streak = computeStats(sessions, [], null, TZ).currentStreak;
-      void show('Zeit zu lesen', streak > 0 ? `Dein Streak von ${streak} Tag${streak > 1 ? 'en' : ''} wartet auf dich – schon 10 Minuten reichen.` : 'Eine kurze Lesesession genügt, um heute dranzubleiben.');
+      const n = personalize(sessions, goals, TZ, now).notify; // gleiche Personalisierung wie Dashboard; null = heute schon gelesen
+      if (n) void show(n.title, n.body);
     };
     tick(); const id = setInterval(tick, 60000); document.addEventListener('visibilitychange', tick);
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); };
-  }, [sessions]);
+  }, [sessions, goals]);
 }
 
 export function ReminderCard() {

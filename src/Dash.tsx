@@ -1,4 +1,6 @@
 import { card } from './ui';
+import { DayHero } from './DayHero';
+import { personalize } from './lib/personal';
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BookOpen, Sparkles } from 'lucide-react';
@@ -22,6 +24,7 @@ export function Dash({ books, sessions, goals, onWrapped }: { books: Book[]; ses
   const per = useMemo(() => computeStats(sessions, books, rangeFor(p, TZ), TZ), [p, sessions, books]);
   const yr = useMemo(() => computeStats(sessions, books, rangeFor('year', TZ), TZ), [sessions, books]);
   const tips = useMemo(() => insights(sessions, books, TZ), [sessions, books]);
+  const me = useMemo(() => personalize(sessions, goals, TZ), [sessions, goals]);
   const map = useMemo(() => new Map(all.daily.map(d => [d.day, d] as const)), [all]);
   const series = (n: number, k: 'pages' | 'minutes') => lastDays(n).map(d => ({ d: d.slice(5), v: Math.round((map.get(d)?.[k] ?? 0) * 10) / 10 }));
   const year = dayKey(new Date(), TZ).slice(0, 4);
@@ -34,6 +37,7 @@ export function Dash({ books, sessions, goals, onWrapped }: { books: Book[]; ses
   const teaser = hasYear && (wst.open || wst.left <= 14) ? <button onClick={wst.open ? onWrapped : undefined} className={`rt-pop relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-5 text-left text-white shadow-lg md:p-7 ${wst.open ? 'transition hover:shadow-2xl' : 'cursor-default'}`}><div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" /><Sparkles className="relative mb-2 h-6 w-6" /><div className="relative text-xs uppercase tracking-[.2em] opacity-80">Reading Wrapped {wst.year}</div><div className="relative mt-1 text-xl font-semibold md:text-2xl">{wst.open ? 'Dein Lesejahr ist da – jetzt ansehen' : `Dein Rückblick erscheint in ${wst.left} Tag${wst.left === 1 ? '' : 'en'}`}</div></button> : null;
   const gl = goals.slice(0, 4).map(g => { const v = progress(g, sessions, books); return { g, v, pct: Math.round(v / g.target_value * 100) }; });
   return <div className="space-y-4">
+    <DayHero p={me} />
     {teaser}
     {!sessions.length && <Empty icon={BookOpen} title="Noch keine Lesesessions" text="Lege ein Buch an und erfasse deine erste Session – dann erscheinen hier deine Statistiken." />}
     <div className="flex items-center gap-2 text-sm"><span>Zeitraum:</span><select className="rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900" value={p} onChange={e => setP(e.target.value)}>{PERIODS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
