@@ -1,5 +1,6 @@
 import { card } from './ui';
 import { DayHero } from './DayHero';
+import { GameStrip } from './Game';
 import { personalize } from './lib/personal';
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -38,6 +39,7 @@ export function Dash({ books, sessions, goals, onWrapped }: { books: Book[]; ses
   const gl = goals.slice(0, 4).map(g => { const v = progress(g, sessions, books); return { g, v, pct: Math.round(v / g.target_value * 100) }; });
   return <div className="space-y-4">
     <DayHero p={me} />
+    <GameStrip />
     {teaser}
     {!sessions.length && <Empty icon={BookOpen} title="Noch keine Lesesessions" text="Lege ein Buch an und erfasse deine erste Session – dann erscheinen hier deine Statistiken." />}
     <div className="flex items-center gap-2 text-sm"><span>Zeitraum:</span><select className="rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900" value={p} onChange={e => setP(e.target.value)}>{PERIODS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>

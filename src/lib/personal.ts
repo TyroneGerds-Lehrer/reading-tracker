@@ -1,10 +1,10 @@
 // Gemeinsame Personalisierung: EINE Berechnung des persönlichen "Tagesbilds", die Dashboard, Motivation,
 // lokale Erinnerung (notify.tsx) und später Berichte nutzen. Reine Funktion, nur aus Sessions/Zielen berechnet.
-import { computeStats, dayKey, type Session } from './stats';
+import { computeStats, dayKey, isProtectedDay, type Session } from './stats';
 
 export type GoalLike = { goal_type: string; target_value: number };
-export type DayState = 'empty' | 'start' | 'risk' | 'secured' | 'goal';
-export type WeekDay = { day: string; label: string; read: boolean; today: boolean; future: boolean };
+export type DayState = 'empty' | 'start' | 'risk' | 'secured' | 'goal' | 'paused';
+export type WeekDay = { day: string; label: string; read: boolean; today: boolean; future: boolean; shielded: boolean };
 export type Personal = {
   state: DayState;
   today: { minutes: number; pages: number; sessions: number };
@@ -39,20 +39,22 @@ export function personalize(sessions: Session[], goals: GoalLike[], tz: string, 
   const pph = past.pagesPerHour ?? all.pagesPerHour, pagesGoal = pph && pph > 0 ? Math.max(1, Math.round(goalMin * pph / 60)) : null;
   const minutes = Math.round(day.minutes), pages = day.pages, readToday = day.sessionsCount > 0;
   const streak = all.currentStreak, longest = all.longestStreak, pct = Math.round(minutes / goalMin * 100);
-  const state: DayState = !all.sessionsCount ? 'empty' : minutes >= goalMin ? 'goal' : readToday ? 'secured' : streak > 0 ? 'risk' : 'start';
+  const paused = !readToday && isProtectedDay(today);
+  const state: DayState = !all.sessionsCount ? 'empty' : minutes >= goalMin ? 'goal' : readToday ? 'secured' : paused ? 'paused' : streak > 0 ? 'risk' : 'start';
 
   const readDays = new Set(all.daily.map(d => d.day)), mon = t - ((new Date(t * 864e5).getUTCDay() + 6) % 7);
-  const week: WeekDay[] = WD.map((label, i) => { const d = iso(mon + i); return { day: d, label, read: readDays.has(d), today: d === today, future: d > today }; });
+  const week: WeekDay[] = WD.map((label, i) => { const d = iso(mon + i); return { day: d, label, read: readDays.has(d), today: d === today, future: d > today, shielded: !readDays.has(d) && isProtectedDay(d) }; });
 
   const pg = pagesGoal ? ` (ca. ${pagesGoal} Seiten)` : '';
   const left = Math.max(1, 24 - hour), late = hour >= 17 ? ` Es bleiben noch etwa ${left} Std.` : '';
   const rec = streak >= 2 && streak >= longest ? ' Das ist dein persönlicher Rekord!' : streak > 0 && longest > streak ? ` Bis zu deinem Rekord (${days(longest)}) fehlen ${days(longest - streak)}.` : '';
-  const streakNote = streak === 0 ? (longest > 0 ? `Dein Rekord: ${days(longest)}.` : 'Lies heute, um deinen ersten Streak zu starten.') : readToday ? `Heute gesichert.${rec}` : `Heute noch offen.${rec}`;
+  const streakNote = streak === 0 ? (longest > 0 ? `Dein Rekord: ${days(longest)}.` : 'Lies heute, um deinen ersten Streak zu starten.') : readToday ? `Heute gesichert.${rec}` : paused ? `Heute durch den Pausenmodus geschützt.${rec}` : `Heute noch offen.${rec}`;
 
   let headline: string, text: string, notify: Personal['notify'] = null;
   if (state === 'empty') { headline = 'Los geht’s!'; text = `Erfasse deine erste Lesesession. Dann siehst du hier deinen Tagesring, deinen Streak und deinen persönlichen Impuls. Startwert fürs Tagesziel: ${goalMin} Min.`; }
   else if (state === 'goal') { headline = 'Tagesziel geschafft!'; text = `${minutes} von ${goalMin} Min. und ${pages} Seiten gelesen. Dein Streak steht bei ${days(streak)} – morgen wäre Tag ${streak + 1}.`; }
   else if (state === 'secured') { headline = 'Streak für heute gesichert'; text = `${minutes} Min. und ${pages} Seiten gelesen. Noch ${goalMin - minutes} Min. bis zu deinem Tagesziel von ${goalMin} Min.`; }
+  else if (state === 'paused') { headline = 'Pausenmodus aktiv'; text = `Dein Streak${streak > 0 ? ` von ${days(streak)}` : ''} ist geschützt. Du musst heute nicht lesen – wenn du magst, zählt jede Session trotzdem.`; }
   else if (state === 'risk') {
     headline = `Dein Streak von ${days(streak)} wartet`; text = `Heute noch nicht gelesen. ${goalMin} Min.${pg} halten ihn am Leben.${late}`;
     notify = { title: 'Zeit zu lesen', body: `Dein Streak von ${days(streak)} wartet auf dich – ${goalMin} Min.${pg} genügen.` };

@@ -29,3 +29,12 @@ button:not([class]):hover { background: rgb(113 113 122 / .12); } button[class="
 @keyframes rtbar { from { width: 0; } to { width: 100%; } }
 .rt-pop { animation: rtpop .7s cubic-bezier(.2, .9, .3, 1.2) both; } .rt-rise { animation: rtrise .6s ease both; }
 .rt-grow { transform-origin: bottom; animation: rtgrow .8s cubic-bezier(.2, .8, .2, 1) both; } .rt-cell { animation: rtcell .5s ease both; }
+
+/* Spielelemente: Konfetti, Leuchtring, wackelndes Geschenk */
+@keyframes rtconf { 0% { transform: translate3d(0, -12vh, 0) rotate(0deg); opacity: 1; } 100% { transform: translate3d(var(--dx, 0px), 108vh, 0) rotate(var(--rot, 720deg)); opacity: .95; } }
+.rt-conf { position: absolute; top: 0; left: var(--x); width: 9px; height: 15px; border-radius: 2px; background: var(--c); animation: rtconf var(--d) cubic-bezier(.3, .6, .5, 1) var(--delay) both; }
+@keyframes rtglow { 0%, 100% { box-shadow: 0 0 0 0 rgb(255 255 255 / .45); } 50% { box-shadow: 0 0 0 18px rgb(255 255 255 / 0); } }
+.rt-glow { animation: rtglow 1.8s ease-out infinite; }
+@keyframes rtwobble { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(-10deg) scale(1.05); } 40% { transform: rotate(9deg) scale(1.05); } 60% { transform: rotate(-6deg); } 80% { transform: rotate(4deg); } }
+.rt-wobble { animation: rtwobble 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .rt-conf { display: none; } }

@@ -19,9 +19,13 @@ Deno.serve(async req => {
       if (hm < s.remind_time || s.last_sent === today) continue;
       const { data: rows } = await sb.from('reading_sessions').select('session_date').eq('user_id', s.user_id).gte('session_date', shift(today, -120)).limit(5000);
       const days = new Set((rows ?? []).map(r => r.session_date as string));
+      // Pausenmodus und eingesetzte Schutzschilde (Tabelle game_events; fehlt sie, bleibt die Liste leer)
+      const { data: ev } = await sb.from('game_events').select('kind,event_date,end_date').eq('user_id', s.user_id).in('kind', ['pause', 'freeze']).gte('event_date', shift(today, -150));
+      const prot = new Set<string>();
+      for (const e of ev ?? []) { if (e.kind === 'freeze') prot.add(e.event_date as string); else { const end = (e.end_date ?? e.event_date) as string; for (let k = e.event_date as string, i = 0; k <= end && i < 62; k = shift(k, 1), i++) prot.add(k); } }
       await sb.from('push_subscriptions').update({ last_sent: today }).eq('id', s.id);
-      if (days.has(today)) continue; // heute schon gelesen: keine Nachricht
-      let streak = 0; while (days.has(shift(today, -(streak + 1)))) streak++;
+      if (days.has(today) || prot.has(today)) continue; // heute schon gelesen oder Pausenmodus: keine Nachricht
+      let streak = 0, d = shift(today, -1); while (days.has(d) || prot.has(d)) { if (days.has(d)) streak++; d = shift(d, -1); }
       const body = streak > 0 ? `Dein Streak von ${streak} Tag${streak > 1 ? 'en' : ''} wartet auf dich – schon 10 Minuten reichen.` : 'Eine kurze Lesesession genügt, um heute dranzubleiben.';
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify({ title: 'Zeit zu lesen', body }));
       sent++;

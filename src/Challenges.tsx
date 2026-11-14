@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
-import { BookOpen, CalendarDays, Clock, Compass, Flame, Layers, Medal, Repeat, TrendingUp, Trophy, Users, Zap, type LucideIcon } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import { card } from './ui';
+import { FAMS, TIER_CLS, famValues, tierName, tierOf } from './lib/game';
+import { useG } from './Game';
 import { TZ } from './lib/tz';
 import { dayKey, isValid, pagesOf, type Book, type Session } from './lib/stats';
 
@@ -13,13 +15,11 @@ const weekStart = (k: string) => iso(dn(k) - ((new Date(dn(k) * 864e5).getUTCDay
 const fm = (m: number) => (m >= 60 && m % 60 === 0 ? `${m / 60} Std.` : `${m} Min.`);
 const groupBy = (v: Session[], key: (d: string) => string) => { const m = new Map<string, A>(); for (const s of v) { const k = key(s.session_date), a = m.get(k) ?? { pages: 0, minutes: 0, days: new Set<string>(), sessions: 0, longest: 0 }; a.pages += pagesOf(s); a.minutes += s.duration_minutes; a.days.add(s.session_date); a.sessions++; a.longest = Math.max(a.longest, s.duration_minutes); m.set(k, a); } return m; };
 const run = (a: A) => { let best = 0, c = 0, p = NaN; for (const k of [...a.days].sort()) { c = dn(k) === p + 1 ? c + 1 : 1; best = Math.max(best, c); p = dn(k); } return best; };
-const th = (list: number[], f: number) => (n: number) => (n < list.length ? list[n] : Math.round(list[list.length - 1] * f ** (n - list.length + 1)));
-const TN = ['Bronze', 'Silber', 'Gold', 'Platin', 'Diamant', 'Meister', 'Legende'];
-const TC = ['bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300', 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-200', 'bg-yellow-100 text-yellow-600 dark:bg-yellow-500/15 dark:text-yellow-300', 'bg-cyan-100 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300', 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300', 'bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300', 'bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300'];
 const Bar = ({ pct, ok }: { pct: number; ok?: boolean }) => <div className="mt-1.5 h-2 rounded-full bg-zinc-200 dark:bg-zinc-800"><div className={`h-2 rounded-full transition-all ${ok ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(100, pct)}%` }} /></div>;
 const Head = ({ t }: { t: string }) => <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight"><Trophy className="h-5 w-5 text-indigo-500" />{t}</h2>;
 
 export function Gamification({ books, sessions }: { books: Book[]; sessions: Session[] }) {
+  const gm = useG();
   const G = useMemo(() => {
     const v = sessions.filter(isValid), today = dayKey(new Date(), TZ), ws = weekStart(today), ym = today.slice(0, 7);
     const wk = groupBy(v, weekStart), mo = groupBy(v, d => d.slice(0, 7)), byDay = groupBy(v, d => d);
@@ -44,14 +44,7 @@ export function Gamification({ books, sessions }: { books: Book[]; sessions: Ses
     const mp = Math.max(100, Math.ceil(mavg(a => a.pages, 300) / 50) * 50), md = Math.min(28, Math.max(4, Math.ceil(mavg(a => a.days.size, 10))));
     const cm = mo.get(ym) ?? EMPTY, fin = books.filter(b => b.status === 'finished' && b.finish_date?.startsWith(ym)).length;
     const months = [{ t: `${mp} Seiten lesen`, v: Math.round(cm.pages), g: mp, u: 'Seiten' }, { t: `${md} Lesetage`, v: cm.days.size, g: md, u: 'Tage' }, { t: 'Ein Buch abschließen', v: fin, g: 1, u: 'Buch' }];
-    const days = [...new Set(v.map(s => s.session_date))].sort(), all: A = { ...EMPTY, days: new Set(days) }, finished = books.filter(b => b.status === 'finished');
-    const fam: { t: string; I: LucideIcon; v: number; th: (n: number) => number; u: string }[] = [
-      { t: 'Lese-Streak', I: Flame, v: run(all), th: th([3, 7, 14, 30, 60, 100, 180, 365], 1.5), u: 'Tage' }, { t: 'Seiten', I: Layers, v: v.reduce((a, s) => a + pagesOf(s), 0), th: th([250, 500, 1000, 2500, 5000, 10000, 25000], 2), u: 'Seiten' },
-      { t: 'Bücher', I: BookOpen, v: finished.length, th: th([1, 3, 5, 10, 25, 50, 100], 1.5), u: 'Bücher' }, { t: 'Lesezeit', I: Clock, v: Math.floor(v.reduce((a, s) => a + s.duration_minutes, 0) / 60), th: th([5, 10, 25, 50, 100, 250, 500, 1000], 1.5), u: 'Std.' },
-      { t: 'Lesetage', I: CalendarDays, v: days.length, th: th([7, 30, 60, 100, 200, 365, 500], 1.5), u: 'Tage' }, { t: 'Sessions', I: Repeat, v: v.length, th: th([10, 25, 50, 100, 250, 500, 1000], 1.5), u: 'Sessions' },
-      { t: 'Marathon', I: Zap, v: Math.round(Math.max(0, ...v.map(s => s.duration_minutes))), th: th([30, 60, 90, 120, 180, 240, 300], 1.3), u: 'Min. am Stück' }, { t: 'Tagesrekord', I: TrendingUp, v: Math.max(0, ...[...byDay.values()].map(a => a.pages)), th: th([25, 50, 75, 100, 150, 200, 300], 1.3), u: 'Seiten an einem Tag' },
-      { t: 'Entdecker', I: Compass, v: new Set(books.map(b => b.genre).filter(Boolean)).size, th: th([2, 3, 5, 8, 12, 20], 1.4), u: 'Genres' }, { t: 'Autor*innen', I: Users, v: new Set(finished.map(b => b.author).filter(Boolean)).size, th: th([3, 5, 10, 25, 50, 100], 1.5), u: 'Autor*innen' },
-      { t: 'Challenge-Meister', I: Medal, v: done, th: th([5, 15, 30, 60, 100, 200], 1.5), u: 'Challenges' }];
+    const fv = famValues(books, v), fam = FAMS.map(f => ({ ...f, v: f.id === 'challenge' ? done : fv[f.id] ?? 0 }));
     return { wk, ws, cur, last, months, fam };
   }, [sessions, books]);
   const a = G.wk.get(G.ws) ?? EMPTY;
@@ -61,7 +54,7 @@ export function Gamification({ books, sessions }: { books: Book[]; sessions: Ses
       <div className="grid gap-3 md:grid-cols-3">{G.cur.list.map(c => { const val = c.get(a); return <div key={c.id} className={card}><div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Diese Woche</div><div className="mt-1 font-medium">{c.title}</div><div className="mt-1 text-sm text-zinc-500">{val >= c.g ? 'Geschafft!' : `${val} / ${c.g} ${c.u}`}</div><Bar pct={val / c.g * 100} ok={val >= c.g} /></div>; })}</div></section>
     <section className="space-y-3"><Head t="Monats-Challenges" /><div className="grid gap-3 md:grid-cols-3">{G.months.map(c => <div key={c.t} className={card}><div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Dieser Monat</div><div className="mt-1 font-medium">{c.t}</div><div className="mt-1 text-sm text-zinc-500">{c.v >= c.g ? 'Geschafft!' : `${c.v} / ${c.g} ${c.u}`}</div><Bar pct={c.v / c.g * 100} ok={c.v >= c.g} /></div>)}</div></section>
     <section className="space-y-3"><Head t="Abzeichen" /><p className="text-sm text-zinc-500">Jedes Abzeichen hat unbegrenzt viele Stufen – nach Legende geht es mit immer höheren Zielen weiter.</p>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{G.fam.map(f => { let t = 0; while (t < 200 && f.th(t) <= f.v) t++; const next = f.th(t), name = t === 0 ? 'Noch nicht freigeschaltet' : t <= TN.length ? TN[t - 1] : `Stufe ${t}`;
-        return <div key={f.t} className={card + ' flex items-center gap-3 !p-4'}><div className={`rounded-xl p-2.5 ${t === 0 ? 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800' : TC[Math.min(t - 1, TC.length - 1)]}`}><f.I className="h-6 w-6" /></div>
-          <div className="min-w-0 flex-1 text-sm"><div className="flex justify-between gap-2"><span className="truncate font-medium">{f.t}</span><span className="shrink-0 text-xs text-zinc-500">{name}</span></div><Bar pct={f.v / next * 100} /><div className="mt-1 text-xs text-zinc-500">{f.v.toLocaleString('de-DE')} / {next.toLocaleString('de-DE')} {f.u} bis Stufe {t + 1}</div></div></div>; })}</div></section></>;
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{G.fam.map(f => { const t = tierOf(f, f.v), next = f.th(t), name = t === 0 ? 'Noch nicht freigeschaltet' : tierName(t), ed = t > 0 ? gm?.earned.get(`${f.id}:${t}`) : undefined;
+        return <div key={f.t} className={card + ' flex items-center gap-3 !p-4'}><div className={`rounded-xl p-2.5 ${t === 0 ? 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800' : TIER_CLS[Math.min(t - 1, TIER_CLS.length - 1)]}`}><f.I className="h-6 w-6" /></div>
+          <div className="min-w-0 flex-1 text-sm"><div className="flex justify-between gap-2"><span className="truncate font-medium">{f.t}</span><span className="shrink-0 text-xs text-zinc-500">{name}</span></div><Bar pct={f.v / next * 100} /><div className="mt-1 text-xs text-zinc-500">{f.v.toLocaleString('de-DE')} / {next.toLocaleString('de-DE')} {f.u} bis Stufe {t + 1}</div>{ed && <div className="text-xs text-zinc-500">Stufe {t} erreicht am {ed.slice(8)}.{ed.slice(5, 7)}.{ed.slice(0, 4)}</div>}</div></div>; })}</div></section></>;
 }

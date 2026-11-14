@@ -7,6 +7,19 @@ export const pagesOf = (s: Session) => s.end_page - s.start_page; // immer berec
 export const isValid = (s: Session) => s.end_page >= s.start_page && s.start_page >= 0 && s.duration_minutes >= 0;
 export const dayKey = (d: Date, tz: string) => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 const dayNum = (k: string) => Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10)) / 86400000; // DST-sicher
+// Streak-Schutz: Tage, die den Streak nicht unterbrechen (Pausenmodus + eingesetzte Schutzschilde). Die App setzt sie aus den Spiel-Ereignissen.
+let PROTECT = new Set<number>();
+export const setProtectedDays = (days: Iterable<string>) => { PROTECT = new Set([...days].map(dayNum)); };
+export const isProtectedDay = (k: string) => PROTECT.has(dayNum(k));
+// Streaks: geschützte Tage unterbrechen die Serie nicht, zählen aber auch nicht mit.
+export function streaksOf(read: Iterable<string>, todayKey?: string) {
+  const R = new Set<number>([...read].map(dayNum)), all = [...new Set([...R, ...PROTECT])].sort((a, b) => a - b);
+  let longest = 0, run = 0, prev = NaN;
+  for (const d of all) { if (d !== prev + 1) run = 0; if (R.has(d)) run++; longest = Math.max(longest, run); prev = d; }
+  let current = 0;
+  if (todayKey) { const t = dayNum(todayKey); let d = R.has(t) || PROTECT.has(t) ? t : t - 1; while (R.has(d) || PROTECT.has(d)) { if (R.has(d)) current++; d--; } }
+  return { longest, current };
+}
 const hourIn = (iso: string, tz: string) => +new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }).format(new Date(iso));
 export const rangeFor = (preset: string, tz: string, now = new Date()): Range => {
   const today = dayKey(now, tz), y = +today.slice(0, 4), m = +today.slice(5, 7);
@@ -32,8 +45,8 @@ export function computeStats(sessions: Session[], books: Book[], range: Range, t
   const pages = inR.reduce((a, s) => a + pagesOf(s), 0), minutes = inR.reduce((a, s) => a + s.duration_minutes, 0);
   const activeDays = byDay.size, days = [...byDay.keys()].sort();
   const spanDays = range ? dayNum(range.to) - dayNum(range.from) + 1 : days.length ? dayNum(days[days.length - 1]) - dayNum(days[0]) + 1 : 0;
-  const longestStreak = (() => { let best = 0, run = 0, prev = NaN; for (const k of days) { run = dayNum(k) === prev + 1 ? run + 1 : 1; best = Math.max(best, run); prev = dayNum(k); } return best; })();
-  const currentStreak = (() => { const set = new Set(valid.map(s => dayNum(s.session_date))); const t = dayNum(dayKey(new Date(), tz)); let c = 0, d = set.has(t) ? t : t - 1; while (set.has(d)) { c++; d--; } return c; })();
+  const longestStreak = streaksOf(days).longest;
+  const currentStreak = streaksOf(valid.map(s => s.session_date), dayKey(new Date(), tz)).current;
   const weekday = Array(7).fill(0).map(() => ({ minutes: 0, days: 0 }));
   for (const [k, v] of byDay) { const w = new Date(dayNum(k) * 86400000).getUTCDay(); weekday[w].minutes += v.minutes; weekday[w].days++; }
   const buckets = { morgens: 0, mittags: 0, abends: 0, nachts: 0 };

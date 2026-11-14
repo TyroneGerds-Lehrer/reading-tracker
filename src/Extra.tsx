@@ -3,10 +3,11 @@ import { Target } from 'lucide-react';
 import { Empty } from './ui';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from './lib/supabase';
-import { remove, save, sync } from './lib/data';
+import { remove, removeMany, save, sync } from './lib/data';
 import { computeStats, dayKey, type Book, type Session } from './lib/stats';
 
 import { TZ } from './lib/tz';
+import type { GameEvent } from './lib/game';
 export type Goal = { id: string; user_id: string; goal_type: string; target_value: number };
 export const PERIODS: [string, string][] = [['7', '7 Tage'], ['30', '30 Tage'], ['90', '90 Tage'], ['month', 'Aktueller Monat'], ['lastmonth', 'Letzter Monat'], ['year', 'Aktuelles Jahr'], ['lastyear', 'Letztes Jahr'], ['all', 'Gesamter Zeitraum']];
 export const GT: Record<string, string> = { books_year: 'Bücher pro Jahr', pages_year: 'Seiten pro Jahr', pages_month: 'Seiten pro Monat', minutes_week: 'Lesezeit pro Woche (Min.)', minutes_day: 'Lesezeit pro Tag (Min.)', days_month: 'Lesetage pro Monat' };
@@ -52,7 +53,7 @@ export function Heat({ sessions, books }: { sessions: Session[]; books: Book[] }
       {!sessions.some(s => s.session_date === sel) && <div className="text-zinc-500">Keine Sessions an diesem Tag.</div>}</div>}</div>;
 }
 
-export function Settings({ books, sessions, goals, uid }: { books: Book[]; sessions: Session[]; goals: Goal[]; uid: string }) {
+export function Settings({ books, sessions, goals, events, uid }: { books: Book[]; sessions: Session[]; goals: Goal[]; events: GameEvent[]; uid: string }) {
   const [msg, setMsg] = useState(''), [name, setName] = useState(''), [tz, setTz] = useState(TZ), [theme, setTheme] = useState(localStorage.getItem('rt-theme') ?? 'light'), [pw, setPw] = useState('');
   useEffect(() => { void supabase.from('profiles').select('display_name').eq('id', uid).maybeSingle().then(({ data }) => setName(data?.display_name ?? '')); }, [uid]);
   const zones = [...new Set([TZ, ...(((Intl as any).supportedValuesOf?.('timeZone') as string[] | undefined) ?? ['Europe/Berlin'])])];
@@ -89,7 +90,8 @@ export function Settings({ books, sessions, goals, uid }: { books: Book[]; sessi
       setMsg(`Import: ${nb} Bücher, ${ns} Sessions, ${ng} Ziele neu. ${dup} bereits vorhanden (nicht überschrieben), ${bad} ungültig übersprungen.`);
     } catch (e: any) { setMsg('Import fehlgeschlagen: ' + e.message); }
   };
-  const wipe = async () => { if (!confirm('ALLE Bücher, Sessions und Ziele unwiderruflich löschen?')) return; for (const b of books) await remove('books', b.id); for (const s of sessions) await remove('reading_sessions', s.id); for (const g of goals) await remove('reading_goals', g.id); setMsg('Alle Daten gelöscht.'); };
+  const wipe = async () => { if (!confirm('ALLE Bücher, Sessions und Ziele unwiderruflich löschen?')) return; for (const b of books) await remove('books', b.id); for (const s of sessions) await remove('reading_sessions', s.id); for (const g of goals) await remove('reading_goals', g.id); if (events.length) await removeMany('game_events', events.map(e => e.id)); setMsg('Alle Daten gelöscht.'); };
+  const resetGame = async () => { if (!events.length) return setMsg('Es gibt noch keinen Spielstand.'); if (!confirm('Spielstand zurücksetzen (Abzeichen-Daten, Schilde, Pausen, Belohnungen)? Bücher und Sessions bleiben erhalten; Abzeichen und Level werden daraus neu aufgebaut.')) return; await removeMany('game_events', events.map(e => e.id)); setMsg('Spielstand zurückgesetzt. Er wird aus deinen Daten neu aufgebaut.'); };
   const del = async () => { if (!confirm('Konto UND alle Daten endgültig löschen?')) return; const { error } = await supabase.rpc('delete_my_account'); if (error) return setMsg(error.message); await supabase.auth.signOut(); indexedDB.deleteDatabase('reading-tracker'); location.reload(); };
   return <div className="space-y-3"><div className={card + ' space-y-2'}><h3 className="font-medium">Daten</h3><div className="flex flex-wrap gap-2">
     <button className={btn} onClick={() => dl(`reading-tracker-backup-${day}.json`, JSON.stringify({ version: 1, exported_at: new Date().toISOString(), settings: { theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light', timezone: TZ }, books, reading_sessions: sessions, reading_goals: goals }, null, 2), 'application/json')}>JSON-Export</button>
@@ -110,6 +112,6 @@ export function Settings({ books, sessions, goals, uid }: { books: Book[]; sessi
     <p className="text-xs text-zinc-500">Gilt für dieses Gerät und wird beim nächsten Öffnen von Dashboard bzw. Statistik übernommen.</p></div>
     <div className={card + ' space-y-2'}><h3 className="font-medium">Konto</h3><div className="flex flex-wrap gap-2"><button className={btn} onClick={() => void sync()}>Jetzt synchronisieren</button>
       <button className={btn} onClick={() => void demo()}>Beispieldaten erzeugen</button><button className="rounded-lg border border-zinc-400 px-4 py-2" onClick={() => void undemo()}>Beispieldaten löschen</button>
-      <button className="rounded-lg border border-red-600 px-4 py-2 text-red-600" onClick={wipe}>Alle Daten löschen</button><button className="rounded-lg bg-red-600 px-4 py-2 text-white" onClick={del}>Konto löschen</button></div></div>
+      <button className="rounded-lg border border-zinc-400 px-4 py-2" onClick={() => void resetGame()}>Spielstand zurücksetzen</button><button className="rounded-lg border border-red-600 px-4 py-2 text-red-600" onClick={wipe}>Alle Daten löschen</button><button className="rounded-lg bg-red-600 px-4 py-2 text-white" onClick={del}>Konto löschen</button></div></div>
     {msg && <p className="text-sm text-amber-600">{msg}</p>}</div>;
 }

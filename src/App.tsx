@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Session as AuthSession } from '@supabase/supabase-js';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { supabase } from './lib/supabase';
-import { getAll, getConflicts, getStatus, remove, save, sync, type SyncStatus } from './lib/data';
+import { gameReady, getAll, getConflicts, getGameStatus, getStatus, remove, save, sync, type SyncStatus } from './lib/data';
+import { GameCtx, PopupLayer, useGame } from './Game';
+import { protectedFrom, type GameEvent } from './lib/game';
 import { Goals, Heat, Settings, type Goal } from './Extra';
 import { Wrapped } from './Wrapped';
 import { More } from './More';
@@ -14,7 +16,7 @@ import { useReminder } from './notify';
 import { Dash } from './Dash';
 import { Conflicts } from './Conflicts';
 import { BookEditor, SessionEditor, deleteSession } from './Edit';
-import { computeStats, dayKey, insights, rangeFor, type Book, type Session } from './lib/stats';
+import { computeStats, dayKey, insights, rangeFor, setProtectedDays, type Book, type Session } from './lib/stats';
 
 import { TZ } from './lib/tz';
 const NAV = ['Dashboard', 'Meine Bücher', 'Lesesessions', 'Statistiken', 'Leseziele', 'Motivation', 'Reading Wrapped', 'Einstellungen'];
@@ -23,9 +25,12 @@ const BOOK_STATUS: Record<string, string> = { wishlist: 'Leseliste', reading: 'A
 const fmtMin = (m: number) => `${Math.floor(m / 60)} h ${Math.round(m % 60)} min`;
 
 function useLive() {
-  const [v, setV] = useState({ goals: [] as Goal[], books: [] as Book[], sessions: [] as Session[], status: getStatus(), conflicts: 0, ready: false });
+  const [v, setV] = useState({ goals: [] as Goal[], books: [] as Book[], sessions: [] as Session[], events: [] as GameEvent[], status: getStatus(), conflicts: 0, ready: false, gameOk: false, gstat: getGameStatus() });
   useEffect(() => {
-    const load = async () => setV({ ready: true, goals: await getAll<Goal>('reading_goals'), books: await getAll<Book>('books'), sessions: await getAll<Session>('reading_sessions'), status: getStatus(), conflicts: (await getConflicts()).length });
+    const load = async () => {
+      const events = await getAll<GameEvent>('game_events'); setProtectedDays(protectedFrom(events)); // Pausen/Schilde vor allen Streak-Berechnungen setzen
+      setV({ ready: true, goals: await getAll<Goal>('reading_goals'), books: await getAll<Book>('books'), sessions: await getAll<Session>('reading_sessions'), events, status: getStatus(), conflicts: (await getConflicts()).length, gameOk: gameReady(), gstat: getGameStatus() });
+    };
     void load(); ['rt-sync', 'rt-data'].forEach(e => window.addEventListener(e, load)); return () => ['rt-sync', 'rt-data'].forEach(e => window.removeEventListener(e, load));
   }, []);
   return v;
@@ -138,8 +143,9 @@ const SYNC: Record<SyncStatus, { Icon: LucideIcon; cls: string }> = {
 
 export default function App() {
   const [auth, setAuth] = useState<AuthSession | null | undefined>(undefined), [tab, setTab] = useState(0), [more, setMore] = useState(false), [dark, setDark] = useState(localStorage.getItem('rt-theme') ? localStorage.getItem('rt-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
-  const { books, sessions, goals, status, conflicts, ready } = useLive();
+  const { books, sessions, goals, events, status, conflicts, ready, gameOk, gstat } = useLive();
   useReminder(sessions, goals);
+  const game = useGame({ uid: auth?.user.id ?? null, books, sessions, events, ready, gameOk, gstat });
   useEffect(() => { supabase.auth.getSession().then(r => setAuth(r.data.session)); const { data } = supabase.auth.onAuthStateChange((_e, s) => { setAuth(s); if (s) void sync(); }); return () => data.subscription.unsubscribe(); }, []);
   useEffect(() => { document.documentElement.classList.toggle('dark', dark); }, [dark]);
   useEffect(() => { if (!auth) return; void supabase.from('profiles').select('timezone,preferred_theme').eq('id', auth.user.id).maybeSingle().then(({ data }) => { if (!data) return; if (data.preferred_theme) { localStorage.setItem('rt-theme', data.preferred_theme); setDark(data.preferred_theme === 'dark'); } if (data.timezone && data.timezone !== TZ) { localStorage.setItem('rt-tz', data.timezone); location.reload(); } }); }, [auth?.user.id]);
@@ -155,7 +161,7 @@ export default function App() {
   const bot = (i: number, label: string) => { const I = NAVI[i]; return <button key={i} onClick={() => go(i)} className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${tab === i ? 'text-indigo-600 dark:text-indigo-300' : 'text-zinc-500'}`}><I className="h-5 w-5" />{label}</button>; };
   const themeBtn = <button onClick={toggleTheme} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/70">{dark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}{dark ? 'Heller Modus' : 'Dunkler Modus'}</button>;
   const outBtn = <button onClick={() => supabase.auth.signOut()} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/70"><LogOut className="h-[18px] w-[18px]" />Abmelden</button>;
-  return <div className="min-h-screen md:pl-64">
+  return <GameCtx.Provider value={game}><div className="min-h-screen md:pl-64">
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col gap-1 border-r border-zinc-200 bg-white/80 p-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80 md:flex"><div className="mb-5 px-1 pt-1">{logo}</div>
       {[0, 1, 2, 3, 4, 5, 6, 7].map(side)}<div className="mt-auto flex flex-col gap-1"><div className="flex flex-wrap items-center gap-2 px-1 pb-2">{pill}{confBtn}</div>{themeBtn}{outBtn}</div></aside>
     <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-zinc-200 bg-white/85 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/85 md:hidden" style={{ paddingTop: 'max(.75rem, env(safe-area-inset-top))' }}>{logo}<div className="flex items-center gap-2">{confBtn}{pill}</div></header>
@@ -164,9 +170,9 @@ export default function App() {
         {tab === 0 && <Dash books={books} sessions={sessions} goals={goals} onWrapped={() => go(6)} />}{tab === 1 && <Books books={books} uid={uid} />}{tab === 2 && <Sessions books={books} sessions={sessions} uid={uid} />}
         {tab === 3 && <><Statistics books={books} sessions={sessions} /><Heat books={books} sessions={sessions} /><More books={books} sessions={sessions} /></>}
         {tab === 4 && <Goals goals={goals} books={books} sessions={sessions} uid={uid} />}{tab === 5 && <Motivation books={books} sessions={sessions} goals={goals} />}{tab === 6 && <Wrapped books={books} sessions={sessions} />}
-        {tab === 7 && <><Conflicts /><Settings books={books} sessions={sessions} goals={goals} uid={uid} /></>}</>}</div></main>
+        {tab === 7 && <><Conflicts /><Settings books={books} sessions={sessions} goals={goals} events={events} uid={uid} /></>}</>}</div></main>
     {more && <div className="fixed inset-0 z-30 md:hidden" onClick={() => setMore(false)}><div className="absolute inset-x-3 bottom-20 flex flex-col gap-1 rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl dark:border-zinc-800 dark:bg-zinc-900" onClick={e => e.stopPropagation()}>{[4, 5, 6, 7].map(side)}{themeBtn}{outBtn}</div></div>}
     <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 md:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {bot(0, 'Start')}{bot(1, 'Bücher')}{bot(2, 'Sessions')}{bot(3, 'Statistik')}
-      <button onClick={() => setMore(!more)} className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${tab >= 4 || more ? 'text-indigo-600 dark:text-indigo-300' : 'text-zinc-500'}`}><Menu className="h-5 w-5" />Mehr</button></nav></div>;
+      <button onClick={() => setMore(!more)} className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${tab >= 4 || more ? 'text-indigo-600 dark:text-indigo-300' : 'text-zinc-500'}`}><Menu className="h-5 w-5" />Mehr</button></nav><PopupLayer /></div></GameCtx.Provider>;
 }
